@@ -26,7 +26,7 @@ class Sqlutil:
     self.connection.commit()
     return
 
-  def __execute(self,sql):
+  def execute(self,sql):
     self.cursor.execute(sql)
     return 
 
@@ -34,19 +34,23 @@ class Sqlutil:
     return self.cursor.fetchall()
 
   def select(self,columns,table,*other):
-    self.__execute("select %s from %s %s;" \
+    self.execute("select %s from %s %s;" \
         %((",".join(columns) if isinstance(columns,list) else columns),table," ".join(other)))
     return self.__getresult()
 
   def insert(self,table,values):
     values = map(convert,values)
-    self.__execute("insert into %s values (%s);" %(table,",".join(values)))
+    self.execute("insert into %s values (%s);" %(table,",".join(values)))
     return
 
   def update(self,table,setter,*other):
     values = ["%s = %s" %(column , convert(value)) for (column , value) in setter]
-    self.__execute("update %s set %s %s;" %(table,",".join(values)," ".join(other)))
+    self.execute("update %s set %s %s;" %(table,",".join(values)," ".join(other)))
     return
+
+  def delete(self,table,*other):
+    self.execute("delete from %s %s" %(table," ".join(other)))
+    return 
 
   def close(self):
     self.commit()
