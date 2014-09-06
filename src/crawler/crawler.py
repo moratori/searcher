@@ -7,11 +7,13 @@ import sys
 import time
 import datetime
 import re
+import traceback
+import logging
+import getcharset as detect
 from HTMLParser import HTMLParser
 from sqlutil import *
 from functools import partial
-import traceback
-import logging
+
 
 
 DMAPPER = "dmapper"
@@ -22,6 +24,7 @@ WHITE   = "white"
 
 db      = "crawler"
 host    = "localhost"
+
 
 logging.basicConfig(filename="crawler.log")
 
@@ -70,6 +73,100 @@ class Node:
 
   def isempty(self):
     return len(self.container) == 0
+
+
+
+# html に含まれる 全てのURLオブジェクトとutf8のテキストを返す
+# text エンコーディングが純粋に書いてあればおｋ
+# 書いて無ければ shift-jis と仮定しよう
+# HTTPのContent-Type にcharsetの指定がなく、Metaタグに書いてあっただけの場合は
+# HTMLAnalizeの全ての処理(様々文字列処理を内部に含む)が終わった後にdecode.encode
+# されるので途中の内部の文字列処理(HTMLParserが正規表現つかってなんかやってるっぽいやつ)
+# が例外吐くかもしれん
+# なので この HTMLAnalizerに掛ける前に、headの中を特別にみたりして
+# エンコーディングの問題は解決してからにするのが好ましい
+class HTMLAnalizer(HTMLParser):
+  
+
+  target = "title"
+  untarget_tag  = ["script","style"]
+  target_prp   = ["src","href"]
+
+  exclude_extension = \
+     set(["jpg","jpeg","png","gif","ico","bmp",\
+       "wmv","wma","wma","wav","mp4","mp3","mid","midi","mov","mpg","mpeg","avi",".swf" ,\
+       "xls","xlsx","doc","docx","ppt","pptx","pdf",\
+       "zip","rar","lzh","gz","z","cab",\
+       "css","js","xml","txt","exe","csv"]) 
+
+  exclude_extension = exclude_extension.union(set(["." + each for each in exclude_extension]))
+
+
+  def __init__(self,url,mtype,rawhtmldata):
+    HTMLParser.__init__(self)
+
+    self.charset       = detect.GetCharset.getcharset(mtype)
+    # GetCharsetクラスが頑張ってmetaタグの中みて charset を得るけど、絶対合ってるとはいえないけど
+    # その場合はどうしようか
+    self.charset       = detect.GetCharset(rawhtmldata).start() if not self.charset else self.charset
+    self.rawhtml       = rawhtmldata.decode(self.charset)
+    self.url           = url
+
+    self.innertag_list = []
+    self.toplevel_tag  = ""
+
+    self.tdata         = ""
+    self.rtext         = ""  
+    self.rlinks        = []
+
+
+  def analizeprp(self,stag,attrs):
+    # 指定されたリンクプロパティを得る
+    for (attr,val) in attrs:
+      if not val : continue
+      val = val.strip()
+      if (attr in self.target_prp):
+        urlobj = urlparse.urlparse(val)
+        self.rlinks.append(\
+            urlparse.urlparse(urlparse.urljoin(self.url,val)) if (urlobj.scheme == "")\
+            else urlobj)
+
+  def handle_starttag(self,stag,attrs):
+    self.innertag_list.insert(0,stag)
+    self.toplevel_tag = stag
+    self.analizeprp(stag,attrs)
+
+  def handle_endtag(self,etag):
+    if etag in self.innertag_list:
+      self.innertag_list.remove(etag)
+
+  def handle_data(self,data):
+    if every(lambda x:(x not in self.innertag_list) , self.untarget_tag):
+      self.rtext += data
+    if self.target in self.innertag_list:
+      self.tdata = data
+
+  # 明らかにhtmlファイル返さないであろうurlをフィルタする
+  def urlfilter(self,links):
+    result = []
+    for each in links:
+      if every(\
+          lambda rule:((not each.path.endswith(rule)) and (not urlparse.urlunparse(each).endswith(rule))),\
+          self.exclude_extension):
+        result.append(each)
+    return result
+
+  def start(self):
+    self.feed(self.rawhtml)
+    title = self.tdata.encode("utf-8")
+    text = ""
+    for each in self.rtext.encode("utf-8").split("\n"):
+      tmp = each.strip()
+      if tmp != "" : text += tmp + " "
+    return title,text,self.urlfilter(self.rlinks)
+
+
+
 
 
 class Crawler:
@@ -162,9 +259,9 @@ class Crawler:
     
     apply(partial(self.save,r_id),HTMLAnalizer(url,mtype,html_raw_data).start())
 
-  def save(self,r_id,utftitle,utftext,links):
+  def save(self,r_id,utf_title,utf_text,links):
     # 注意スべきは links であり、すでにDBに格納されているものがあったり、
-    # 
+    # するので重複しないように格納する処理が必要
     pass
 
 
@@ -176,113 +273,8 @@ class Crawler:
     self.db.close()
 
 
-# html に含まれる 全てのURLオブジェクトとutf8のテキストを返す
-# text エンコーディングが純粋に書いてあればおｋ
-# 書いて無ければ shift-jis と仮定しよう
-class HTMLAnalizer(HTMLParser):
-  
-  default_charset = "shift_jis"
-
-  target = "title"
-  untarget_tag  = ["script"]
-  target_prp   = ["src","href"]
-
-  exclude_extension = \
-     set(["jpg","jpeg","png","gif","ico","bmp",\
-       "wmv","wma","wma","wav","mp4","mp3","mid","midi","mov","mpg","mpeg","avi",".swf" ,\
-       "xls","xlsx","doc","docx","ppt","pptx","pdf",\
-       "zip","rar","lzh","gz","z","cab",\
-       "css","js","exe","csv"]) 
-
-  exclude_extension = exclude_extension.union(set(["." + each for each in exclude_extension]))
 
 
-  def __init__(self,url,mtype,rawhtmldata):
-    HTMLParser.__init__(self)
-
-    self.mtype         = mtype
-    self.url           = url
-    self.rawhtml       = rawhtmldata
-
-    self.innertag_list = []
-    self.toplevel_tag  = ""
-    self.charset       = self.getcharset(self.mtype)
-
-    self.tdata         = ""
-    self.rtext         = ""  
-    self.rlinks        = []
-
-
-  def getcharset(self,mtype):
-    tmp = mtype.split(";")
-    if len(tmp) == 1 : return None
-    target = tmp[1].strip()
-    if not target.startswith("charset=") : return None
-    (_ , charset)=map(lambda x:x.strip(),target.split("="))
-    return charset
-
-
-  def analizeprp(self,stag,attrs):
-    # 指定されたリンクプロパティを得る
-    for (attr,val) in attrs:
-      val = val.strip()
-      if (attr in self.target_prp):
-        urlobj = urlparse.urlparse(val)
-        self.rlinks.append(\
-            urlparse.urlparse(urlparse.urljoin(self.url,val)) if (urlobj.scheme == "")\
-            else urlobj)
-    # meta タグに記載されているかもしれないキャラセットを求めて ...
-    if (stag == "meta") and (not self.charset):
-      tmp = dict(map(lambda x:(x[0].lower(),x[1].lower()) , attrs))
-      if ("http-equiv" in tmp) and (tmp["http-equiv"] == "content-type") and ("content" in tmp):
-        r = self.getcharset(tmp["content"])
-        self.charset = r if r else self.default_charset
-      else:
-        self.charset = self.default_charset
-
-
-  def handle_starttag(self,stag,attrs):
-    self.innertag_list.insert(0,stag)
-    self.toplevel_tag = stag
-    self.analizeprp(stag,attrs)
-
-  def handle_endtag(self,etag):
-    if etag in self.innertag_list:
-      self.innertag_list.remove(etag)
-
-  def handle_data(self,data):
-    if every(lambda x:(x not in self.innertag_list) , self.untarget_tag):
-      self.rtext += data
-    if self.target in self.innertag_list:
-      self.tdata = data
-
-
-  def start(self):
-    self.feed(self.rawhtml)
-    charset = self.default_charset if not self.charset else self.charset
-    title = self.tdata.decode(charset).encode("utf8")
-    text = ""
-    for term in self.rtext.decode(charset).encode("utf8").split("\n"):
-      text += term.strip() + " "
-    return title,text,self.urlfilter(self.rlinks)
-
-  # 明らかにhtmlファイル返さないであろうurlをフィルタする
-  def urlfilter(self,links):
-    result = []
-    for each in links:
-      if every(\
-          lambda rule:((not each.path.endswith(rule)) and (not urlparse.urlunparse(each).endswith(rule))),\
-          self.exclude_extension):
-        result.append(each)
-    return result
-
-
-u = "http://www.yahoo.co.jp/"
-(title,text,links) = HTMLAnalizer(u,"",urllib2.urlopen(u).read()).start()
-
-print title
-print text
-print map(urlparse.urlunparse,links)
 
 
 
