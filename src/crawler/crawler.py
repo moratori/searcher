@@ -10,6 +10,9 @@ import re
 import traceback
 import logging
 import getcharset as detect
+import random
+import hashlib
+
 from HTMLParser import HTMLParser
 from sqlutil import *
 from functools import partial
@@ -32,11 +35,15 @@ logging.basicConfig(filename="crawler.log")
 (user,passwd) = map(lambda x:x.strip(),open(".pwd").readlines())
 
 
-
 def every(func,seq):
   for each in seq:
     if not func(each):return False
   return True
+
+def gethash(s):
+  i = hashlib.sha256()
+  i.update(s)
+  return i.hexdigest()
 
 
 class DB(Sqlutil):
@@ -51,6 +58,9 @@ class DB(Sqlutil):
   def lookup_domainid(self,r_id):
     result = self.select("d_id" , RMAPPER , "where r_id = %s" %r_id)
     return result[0][0]
+
+  def exists_record(self,table,keyname,keyvalue):
+    return self.select("*",table,"where %s = %s" %(keyname,keyvalue))
 
 
 class Target:
@@ -158,9 +168,9 @@ class HTMLAnalizer(HTMLParser):
 
   def start(self):
     self.feed(self.rawhtml)
-    title = self.tdata.encode("utf-8")
+    title = self.tdata
     text = ""
-    for each in self.rtext.encode("utf-8").split("\n"):
+    for each in self.rtext.split("\n"):
       tmp = each.strip()
       if tmp != "" : text += tmp + " "
     return title,text,self.urlfilter(self.rlinks)
@@ -173,12 +183,12 @@ class Crawler:
 
   # あるドメインへのアクセスは 最低1/3 時間間隔
   d_interval = 3600 * 1/4
-  # 同一リソースへのアクセスは最低 24時間間隔
-  r_interval = 3600 * 24
+  # 同一リソースへのアクセスは最低 24 * 4時間間隔
+  r_interval = 3600 * 24 * 4
   # あるドメインのリソースへのアクセスは 15個以内
   max_access = 15
-  # アクセスするドメインは 50個
-  max_domain = 50
+  # アクセスするドメインは 80個
+  max_domain = 80
 
   def __init__(self):
     self.db = DB(host,user,passwd)
@@ -235,19 +245,21 @@ class Crawler:
 
   def crawl(self,node):
     assert isinstance(node,Node)
+    # node は全て同じ ドメインだったはずなので適当にwaitをかける
     for t in node.container:
       self.stamp(t.d_id,t.r_id)
-      self.analyze(t.r_id,t.url)
+      self.analyze(t.r_id,t.d_id,t.url)
+      time.sleep(random.randint(1,3))
 
   def erase(self,r_id):
     # db には html を返すであろうコンテンツしか登録しないけど
     # もしそうでなかった場合のために r_id レコードをもつやつを削除する
-    self.db.delete("rmapper","where r_id = %s" %r_id)
-    self.db.delute("data" , "where r_id = %s" %r_id)
+    self.db.delete(RMAPPER, "where r_id = %s" %r_id)
+    self.db.delute(DATA   , "where r_id = %s" %r_id)
     return
 
 
-  def analyze(self,r_id,url):
+  def analyze(self,r_id,d_id,url):
     connection = urllib2.urlopen(url)
     mtype = connection.info().getheader("Content-Type")
     # content-type が明示されていない若しくは
@@ -257,16 +269,55 @@ class Crawler:
       return
     html_raw_data = connection.read()
     
-    apply(partial(self.save,r_id),HTMLAnalizer(url,mtype,html_raw_data).start())
+    try:
+      (uni_title,uni_text,links) = HTMLAnalizer(url,mtype,html_raw_data).start()
+    except:
+      self.erase(r_id)
+      return
+    self.save(r_id,d_id,uni_title,uni_text,links)
 
-  def save(self,r_id,utf_title,utf_text,links):
+
+  def save(self, r_id , d_id , uni_title , uni_text , links):
     # 注意スべきは links であり、すでにDBに格納されているものがあったり、
     # するので重複しないように格納する処理が必要
+    # save は dmapper rmapper data の全てのテーブルを書き換え得る
+    # ので書くテーブル毎にメソッドを分けてる
+
+    self.__savedata(r_id,uni_title,uni_text)
+    self.__savelinks(r_id , d_id , links)
+
+  def __savelinks(self , r_id , d_id , links):
     pass
+
+  def __savedata(self,r_id,uni_title,uni_text):
+
+    diff_length = 10;
+    store_title = uni_title.encode("utf-8")
+    store_data  = uni_text.encode("utf-8")
+    store_len   = len(uni_text)
+    store_hash  = gethash(store_data)
+
+    if self.db.exists_record(DATA,"r_id",r_id):
+      # すでに r_id をキーとする レコードが存在するならば
+      # hash をとっておくこのhashと比較して new flag を立てるか判断する材料にする
+      oldhash = self.db.select("hash",DATA,"where r_id = %s" %r_id)[0][0]
+      oldlen  = int(self.db.select("size",DATA,"where r_id = %s" %r_id)[0][0])
+      # hash が違っていて ∧  diff_length 以上/以下 変化してたら newflag　をたてる
+      flag = 1 if ((oldhash != store_hash) and (abs(oldlen - store_len) > diff_length)) else 0
+      self.db.update(DATA,\
+          [("title" , store_title),\
+          ("data" , store_data),\
+          ("size" , store_len),\
+          ("hash",store_hash),\
+          ("new",flag)],\
+          "where r_id = %s" %r_id)
+    else:
+      self.db.insert(DATA,\
+          [r_id , store_title,store_data , store_len , store_hash , 1])
 
 
   def stamp(self,d_id,r_id):
-    self.db.update("dmapper" , [("vtime" , int(time.time()))] , "where d_id = %s" %d_id)
+    self.db.update(DMAPPER , [("vtime" , int(time.time()))] , "where d_id = %s" %d_id)
     self.db.execute("update rmapper set vtime = %s , counter = counter + 1 where r_id = %s" %(int(time.time()),r_id))
 
   def finish(self):
@@ -274,8 +325,4 @@ class Crawler:
 
 
 
-
-
-
-
-
+Crawler().crawl_forever()

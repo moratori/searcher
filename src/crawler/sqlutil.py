@@ -58,15 +58,3 @@ class Sqlutil:
     self.connection.close()
     return
 
-
-
-def sqlutil_sample():
-  a  = Sqlutil("host","user","xxx")
-  a.open("dbname")
-  a.insert("table" , [(1,"name1"),(2,"name2")])
-  a.commit()
-  print a.select("*","table")
-  a.close()
-
-
-
