@@ -22,6 +22,7 @@ from functools import partial
 DMAPPER = "dmapper"
 RMAPPER = "rmapper"
 DATA    = "data"
+LINKR   = "linkr"
 BLACK   = "black"
 WHITE   = "white"
 
@@ -45,22 +46,28 @@ def gethash(s):
   i.update(s)
   return i.hexdigest()
 
+def remove_unnecessary(l):
+  result = []
+  tmp    = set()
+  for each in l:
+    if (not each in tmp) and (each.netloc):
+      result.append(each)
+      tmp.add(each)
+  return result
 
-class DB(Sqlutil):
+def getdname(link):
+  return (link.scheme + "://" + link.netloc).encode("utf-8")
 
-  def __init__(self,host,user,passwd):
-    Sqlutil.__init__(self,host,user,passwd)
+def getpath(link):
+  path = link.path
+  query = link.query
+  result = ((path if query == "" else path + query).encode("utf-8"))
+  return "/" if result == "" else result
 
-  def lookup_domainname(self,d_id):
-    result = self.select("name",DMAPPER,"where (d_id = %s)" %d_id)
-    return result[0][0]
+def escape(text):
+  # utf-8 な文字列しかできない
+  return re.sub(re.compile("[!-/:-@[-`{-~]"),"",text)
 
-  def lookup_domainid(self,r_id):
-    result = self.select("d_id" , RMAPPER , "where r_id = %s" %r_id)
-    return result[0][0]
-
-  def exists_record(self,table,keyname,keyvalue):
-    return self.select("*",table,"where %s = %s" %(keyname,keyvalue))
 
 
 class Target:
@@ -137,9 +144,7 @@ class HTMLAnalizer(HTMLParser):
       val = val.strip()
       if (attr in self.target_prp):
         urlobj = urlparse.urlparse(val)
-        self.rlinks.append(\
-            urlparse.urlparse(urlparse.urljoin(self.url,val)) if (urlobj.scheme == "")\
-            else urlobj)
+        self.rlinks.append((urlparse.urlparse(urlparse.urljoin(self.url,val)) if (urlobj.scheme == "") else urlobj))
 
   def handle_starttag(self,stag,attrs):
     self.innertag_list.insert(0,stag)
@@ -173,20 +178,63 @@ class HTMLAnalizer(HTMLParser):
     for each in self.rtext.split("\n"):
       tmp = each.strip()
       if tmp != "" : text += tmp + " "
-    return title,text,self.urlfilter(self.rlinks)
+    return title , text , self.urlfilter(self.rlinks)
 
 
+
+
+class DB(Sqlutil):
+
+  def __init__(self,host,user,passwd):
+    Sqlutil.__init__(self,host,user,passwd)
+
+
+
+  def revlookup_dname(self,dname):
+    result = self.select("d_id" , DMAPPER , "where name = \"%s\"" %dname)
+    if not result : return None
+    return result[0][0]
+
+  def exists_record(self,table,keyname,keyvalue):
+    return self.select("*",table,"where %s = %s" %(keyname,keyvalue))
+
+  def exists_rmapper(self,d_id,cand):
+    # d_id(dname) であり cand の何れかの path を持つようなのはすでに
+    # rmapper に存在するか?
+    assert (d_id)
+    condition = "where " + ("(d_id = %s) and " %d_id) + "(" +"or".join(map(lambda x: "(path = \"%s\")" %x, cand)) + ")"
+    return self.select("r_id" , RMAPPER ,condition)
+
+
+  # マルチスレッドにするときにこの辺がだめだから
+  # 自動でID増えてくようにしないとだめだ
+
+  def next_d_id(self):
+    tmp = self.select("max(d_id)" , DMAPPER)
+    if not tmp : return 1
+    return tmp[0][0] + 1
+
+  def next_r_id(self):
+    tmp = self.select("max(r_id)" , RMAPPER)
+    if not tmp : return 1
+    return tmp[0][0] + 1
+
+  def next_num(self,r_id):
+    tmp = self.select("max(num)" , LINKR , "where r_id = %s" %r_id)
+    if not tmp : return 1
+    ((r,),) = tmp
+    return (r+ 1) if r else 1
 
 
 
 class Crawler:
 
-  # あるドメインへのアクセスは 最低1/3 時間間隔
-  d_interval = 3600 * 1/4
+  # あるドメインへのアクセスは 最低1/15 時間間隔
+  d_interval = 3600 * 1/15
   # 同一リソースへのアクセスは最低 24 * 4時間間隔
   r_interval = 3600 * 24 * 4
-  # あるドメインのリソースへのアクセスは 15個以内
-  max_access = 15
+  # あるドメインのリソースへのアクセスは 25個以内
+  max_access = 25
   # アクセスするドメインは 80個
   max_domain = 80
 
@@ -231,6 +279,7 @@ class Crawler:
     try:
       while True:
         while roots:
+          ## ここの node らへんをマルチスレッドでアクセスする
           node = roots.pop()
           self.crawl(node)
           # commit の粒度が荒い気がする
@@ -249,23 +298,30 @@ class Crawler:
     for t in node.container:
       self.stamp(t.d_id,t.r_id)
       self.analyze(t.r_id,t.d_id,t.url)
-      time.sleep(random.randint(1,3))
+      time.sleep(random.randint(1,5))
 
   def erase(self,r_id):
     # db には html を返すであろうコンテンツしか登録しないけど
     # もしそうでなかった場合のために r_id レコードをもつやつを削除する
     self.db.delete(RMAPPER, "where r_id = %s" %r_id)
-    self.db.delute(DATA   , "where r_id = %s" %r_id)
+    self.db.delete(DATA   , "where r_id = %s" %r_id)
+    self.db.delete(LINKR , "where r_id = %s" %r_id)
     return
 
 
+  # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
   def analyze(self,r_id,d_id,url):
-    connection = urllib2.urlopen(url)
+    print "Acessing: %s" %url
+    try:
+      connection = urllib2.urlopen(url)
+    except:
+      logging.warning("can't connect url: %s" %url)
+      return
     mtype = connection.info().getheader("Content-Type")
     # content-type が明示されていない若しくは
     # text/html でないなら DBから抹消
     if (not mtype) or (not mtype.startswith("text/html")):
-      self.erace(r_id)
+      self.erase(r_id)
       return
     html_raw_data = connection.read()
     
@@ -273,6 +329,7 @@ class Crawler:
       (uni_title,uni_text,links) = HTMLAnalizer(url,mtype,html_raw_data).start()
     except:
       self.erase(r_id)
+      logging.warning("unparsible contents. erase r_id = %s from DB" %r_id)
       return
     self.save(r_id,d_id,uni_title,uni_text,links)
 
@@ -282,18 +339,66 @@ class Crawler:
     # するので重複しないように格納する処理が必要
     # save は dmapper rmapper data の全てのテーブルを書き換え得る
     # ので書くテーブル毎にメソッドを分けてる
-
     self.__savedata(r_id,uni_title,uni_text)
     self.__savelinks(r_id , d_id , links)
 
+
   def __savelinks(self , r_id , d_id , links):
-    pass
+
+    def get_indexcand(path):
+      if   path.endswith("/"):
+        return [path,path + "index.html" , path + "index.htm"]
+      elif path.endswith("index.html"):
+        base = path[:-10]
+        return [path,base,base + "index.htm"]
+      elif path.endswith("index.htm"):
+        base = path[:9]
+        return [path,base,base + "index.html"]
+      else:
+        return [path]
+
+
+    # dmapper と rmapper と linkr テーブルの変更
+    # まず意味を考えずとも文字列的に一致するもの
+    # netlocが存在しないものを除去する
+    links = remove_unnecessary(links)
+
+    # +++++++ dmapper に登録する +++++++ #
+    for link in links:
+      # domain 名でlookup して レコードが存在しないならば新しくinsert する
+      dname = getdname(link)
+      if not self.db.revlookup_dname(dname):
+        new_id = self.db.next_d_id()
+        d = [new_id , dname , 0]
+        self.db.insert(DMAPPER , d)
+
+    # +++++++ rmapper に登録する ++++++ #
+    child_r_ids = []
+    for link in links: 
+      d_id  = self.db.revlookup_dname(getdname(link))
+      assert (d_id)
+      path = getpath(link)
+      cand = get_indexcand(path)
+      already = self.db.exists_rmapper(d_id,cand)
+      if not already:
+        new_r_id = self.db.next_r_id()
+        self.db.insert(RMAPPER , [new_r_id , d_id , path , 0 , 0])
+        child_r_ids.append(new_r_id)
+      else:
+        child_r_ids.append(already[0][0])
+
+    # +++++++ rmapperの登録の際に生じた r_id と child_r_id の関係をlinkrに記録する +++++++
+    next_num = self.db.next_num(r_id)
+    for child_r_id in child_r_ids:
+      self.db.insert(LINKR,[r_id,next_num,child_r_id])
+      next_num += 1
+
 
   def __savedata(self,r_id,uni_title,uni_text):
 
     diff_length = 10;
-    store_title = uni_title.encode("utf-8")
-    store_data  = uni_text.encode("utf-8")
+    store_title = escape(uni_title.encode("utf-8"))
+    store_data  = escape(uni_text.encode("utf-8"))
     store_len   = len(uni_text)
     store_hash  = gethash(store_data)
 
@@ -312,8 +417,7 @@ class Crawler:
           ("new",flag)],\
           "where r_id = %s" %r_id)
     else:
-      self.db.insert(DATA,\
-          [r_id , store_title,store_data , store_len , store_hash , 1])
+      self.db.insert(DATA,[r_id , store_title,store_data , store_len , store_hash , 1])
 
 
   def stamp(self,d_id,r_id):
@@ -324,5 +428,5 @@ class Crawler:
     self.db.close()
 
 
-
 Crawler().crawl_forever()
+
