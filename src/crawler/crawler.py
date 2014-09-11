@@ -238,6 +238,8 @@ class Crawler:
   # アクセスするドメインは 80個
   max_domain = 80
 
+  timeout = 15
+
   def __init__(self):
     self.db = DB(host,user,passwd)
     self.db.open(db)
@@ -313,7 +315,7 @@ class Crawler:
   def analyze(self,r_id,d_id,url):
     print "Acessing: %s" %url
     try:
-      connection = urllib2.urlopen(url)
+      connection = urllib2.urlopen(url,self.timeout)
     except:
       logging.warning("can't connect url: %s" %url)
       return
