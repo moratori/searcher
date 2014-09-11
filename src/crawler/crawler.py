@@ -229,12 +229,11 @@ class DB(Sqlutil):
 
 class Crawler:
 
-  # あるドメインへのアクセスは 最低1/15 時間間隔
-  d_interval = 3600 * 1/15
+  d_interval = 100
   # 同一リソースへのアクセスは最低 24 * 4時間間隔
   r_interval = 3600 * 24 * 4
   # あるドメインのリソースへのアクセスは 25個以内
-  max_access = 25
+  max_access = 20
   # アクセスするドメインは 80個
   max_domain = 80
 
@@ -247,19 +246,14 @@ class Crawler:
   def __nexttarget(self):
     result = []
     now = int(time.time())
-    num = int(self.max_domain * (2.0/3))
-    target1 = self.db.select(\
+
+    target= self.db.select(\
         ["d_id","name"] ,\
         DMAPPER ,\
-        "where ((%s - vtime) > %s) and (vtime != 0)" %(now,self.d_interval) ,\
-        "order by vtime asc" ,\
-        "limit %s" %num)
-    target2 = self.db.select(\
-            ["d_id","name"],\
-            DMAPPER,\
-            "where (vtime = 0)" ,\
-            "limit %s" %(self.max_domain - num))
-    target  = target1 + target2
+        "where ((%s - vtime) > %s)" %(now,self.d_interval) ,\
+        "order by rand()" ,\
+        "limit %s" %self.max_domain)
+
     for (d_id , name) in target:
       cand = self.db.select(\
           ["r_id","path"] , RMAPPER ,\
@@ -322,7 +316,7 @@ class Crawler:
   def analyze(self,r_id,d_id,url):
     print "Acessing: %s" %url
     try:
-      connection = urllib2.urlopen(url,self.timeout)
+      connection = urllib2.urlopen(url,timeout=self.timeout)
     except:
       logging.warning("can't connect url: %s" %url)
       return
@@ -404,6 +398,7 @@ class Crawler:
 
 
   def __savedata(self,r_id,uni_title,uni_text):
+
 
     diff_length = 10;
     store_title = escape(uni_title.encode("utf-8"))
