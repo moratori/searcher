@@ -247,12 +247,19 @@ class Crawler:
   def __nexttarget(self):
     result = []
     now = int(time.time())
-    target = self.db.select(\
+    num = int(self.max_domain * (2.0/3))
+    target1 = self.db.select(\
         ["d_id","name"] ,\
         DMAPPER ,\
-        "where (%s - vtime) > %s" %(now,self.d_interval) ,\
+        "where ((%s - vtime) > %s) and (vtime != 0)" %(now,self.d_interval) ,\
         "order by vtime asc" ,\
-        "limit %s" %self.max_domain)
+        "limit %s" %num)
+    target2 = self.db.select(\
+            ["d_id","name"],\
+            DMAPPER,\
+            "where (vtime = 0)" ,\
+            "limit %s" %(self.max_domain - num))
+    target  = target1 + target2
     for (d_id , name) in target:
       cand = self.db.select(\
           ["r_id","path"] , RMAPPER ,\
