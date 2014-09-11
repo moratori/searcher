@@ -59,9 +59,10 @@ def getdname(link):
   return (link.scheme + "://" + link.netloc).encode("utf-8")
 
 def getpath(link):
+  pat = re.compile("[\"\'`]")
   path = link.path
   query = link.query
-  result = ((path if query == "" else path + query).encode("utf-8"))
+  result = re.sub(pat,"",((path if query == "" else path + query).encode("utf-8")))
   return "/" if result == "" else result
 
 def escape(text):
@@ -202,6 +203,7 @@ class DB(Sqlutil):
     # d_id(dname) であり cand の何れかの path を持つようなのはすでに
     # rmapper に存在するか?
     assert (d_id)
+    # ここで lambda の x をエスケープしなければ
     condition = "where " + ("(d_id = %s) and " %d_id) + "(" +"or".join(map(lambda x: "(path = \"%s\")" %x, cand)) + ")"
     return self.select("r_id" , RMAPPER ,condition)
 
