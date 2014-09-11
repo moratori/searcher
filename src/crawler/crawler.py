@@ -229,13 +229,13 @@ class DB(Sqlutil):
 
 class Crawler:
 
-  d_interval = 100
+  d_interval = 180
   # 同一リソースへのアクセスは最低 24 * 4時間間隔
   r_interval = 3600 * 24 * 4
-  # あるドメインのリソースへのアクセスは 25個以内
+  # あるドメインのリソースへのアクセスは 20個以内
   max_access = 20
   # アクセスするドメインは 80個
-  max_domain = 80
+  max_domain = 70
 
   timeout = 15
 
@@ -301,7 +301,7 @@ class Crawler:
     for t in node.container:
       self.stamp(t.d_id,t.r_id)
       self.analyze(t.r_id,t.d_id,t.url)
-      time.sleep(random.randint(1,5))
+      time.sleep(random.randint(1,3))
 
   def erase(self,r_id):
     # db には html を返すであろうコンテンツしか登録しないけど
