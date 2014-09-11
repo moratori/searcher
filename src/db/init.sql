@@ -7,5 +7,5 @@ create table data(r_id int primary key not null , title text , data text , size 
 create table linkr(r_id int, num int , child_r_id int );
 alter table linkr add constraint primary key(r_id,num);
 
-insert into dmapper values(1,'http://web.dendai.ac.jp',0);
+insert into dmapper values(1,'https://lib.mrcl.dendai.ac.jp/webopac/jsp/script/FUNC_AJAX.jsp',0);
 insert into rmapper(r_id,d_id) values(1,1);

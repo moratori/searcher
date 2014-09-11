@@ -59,15 +59,18 @@ def getdname(link):
   return (link.scheme + "://" + link.netloc).encode("utf-8")
 
 def getpath(link):
-  pat = re.compile("[\"\'`]")
   path = link.path
   query = link.query
-  result = re.sub(pat,"",((path if query == "" else path + query).encode("utf-8")))
+  result = ((path if query == "" else path + query).encode("utf-8"))
   return "/" if result == "" else result
 
 def escape(text):
   # utf-8 な文字列しかできない
   return re.sub(re.compile("[!-/:-@[-`{-~]"),"",text)
+
+def path_escape(s):
+  pat = re.compile('[\\\\"\'`]')
+  return re.sub(pat,"",s)
 
 
 
@@ -204,7 +207,7 @@ class DB(Sqlutil):
     # rmapper に存在するか?
     assert (d_id)
     # ここで lambda の x をエスケープしなければ
-    condition = "where " + ("(d_id = %s) and " %d_id) + "(" +"or".join(map(lambda x: "(path = \"%s\")" %x, cand)) + ")"
+    condition = "where " + ("(d_id = %s) and " %d_id) + "(" +"or".join(map(lambda x: "(path = \"%s\")" %path_escape(x), cand)) + ")"
     return self.select("r_id" , RMAPPER ,condition)
 
 
