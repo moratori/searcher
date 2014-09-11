@@ -242,6 +242,8 @@ class Crawler:
   # アクセスするドメインは 80個
   max_domain = 70
 
+  c_interval = 5
+
   timeout = 15
 
   def __init__(self):
@@ -255,7 +257,10 @@ class Crawler:
     target= self.db.select(\
         ["d_id","name"] ,\
         DMAPPER ,\
+        "as res" ,\
         "where ((%s - vtime) > %s)" %(now,self.d_interval) ,\
+        "and ((not exists (select d_id from white limit 1)) or (exists (select d_id from white where res.d_id = white.d_id)))" ,\
+        "and (not exists (select d_id from black where res.d_id = black.d_id))" ,\
         "order by rand()" ,\
         "limit %s" %self.max_domain)
 
@@ -306,7 +311,7 @@ class Crawler:
     for t in node.container:
       self.stamp(t.d_id,t.r_id)
       self.analyze(t.r_id,t.d_id,t.url)
-      time.sleep(random.randint(1,3))
+      time.sleep(random.randint(1,self.c_interval))
 
   def erase(self,r_id):
     # db には html を返すであろうコンテンツしか登録しないけど
@@ -437,5 +442,7 @@ class Crawler:
     self.db.close()
 
 
-Crawler().crawl_forever()
 
+controller = Crawler()
+controller.d_interval = 3
+controller.crawl_forever()
