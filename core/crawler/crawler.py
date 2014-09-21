@@ -14,8 +14,7 @@ import random
 import hashlib
 
 from HTMLParser import HTMLParser
-from sqlutil import *
-from functools import partial
+from searcher.core.db.sqlutil import *
 
 
 
@@ -26,14 +25,12 @@ LINKR   = "linkr"
 BLACK   = "black"
 WHITE   = "white"
 
-db      = "crawler"
+db      = "searcher"
 host    = "localhost"
 
 
-logging.basicConfig(filename="crawler.log")
-
-
-(user,passwd) = map(lambda x:x.strip(),open(".pwd").readlines())
+logging.basicConfig(filename="/home/moratori/Github/searcher/core/crawler/crawler.log")
+(user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
 def every(func,seq):
@@ -67,11 +64,6 @@ def getpath(link):
 def escape(text):
   # utf-8 な文字列しかできない
   return re.sub(re.compile("[!-/:-@[-`{-~]"),"",text)
-
-def path_escape(s):
-  pat = re.compile('[\\\\"\'`]')
-  return re.sub(pat,"",s)
-
 
 
 class Target:
@@ -187,64 +179,31 @@ class HTMLAnalizer(HTMLParser):
 
 
 
-class DB(Sqlutil):
-
-  def __init__(self,host,user,passwd):
-    Sqlutil.__init__(self,host,user,passwd)
-
-
-
-  def revlookup_dname(self,dname):
-    result = self.select("d_id" , DMAPPER , "where name = \"%s\"" %dname)
-    if not result : return None
-    return result[0][0]
-
-  def exists_record(self,table,keyname,keyvalue):
-    return self.select("*",table,"where %s = %s" %(keyname,keyvalue))
-
-  def exists_rmapper(self,d_id,cand):
-    # d_id(dname) であり cand の何れかの path を持つようなのはすでに
-    # rmapper に存在するか?
-    assert (d_id)
-    # ここで lambda の x をエスケープしなければ
-    condition = "where " + ("(d_id = %s) and " %d_id) + "(" +"or".join(map(lambda x: "(path = \"%s\")" %path_escape(x), cand)) + ")"
-    return self.select("r_id" , RMAPPER ,condition)
-
-
-  # マルチスレッドにするときにこの辺がだめだから
-  # 自動でID増えてくようにしないとだめだ
-
-  def next_d_id(self):
-    tmp = self.select("max(d_id)" , DMAPPER)
-    if not tmp : return 1
-    return tmp[0][0] + 1
-
-  def next_r_id(self):
-    tmp = self.select("max(r_id)" , RMAPPER)
-    if not tmp : return 1
-    return tmp[0][0] + 1
-
-  def next_num(self,r_id):
-    tmp = self.select("max(num)" , LINKR , "where r_id = %s" %r_id)
-    if not tmp : return 1
-    ((r,),) = tmp
-    return (r+ 1) if r else 1
-
 
 
 class Crawler:
+  
+  # 同一domainにアクセスするのは 180sec ごのinterval
+  # これがでかいと広く浅いcrawlになる
+  d_interval = 200
 
-  d_interval = 180
   # 同一リソースへのアクセスは最低 24 * 4時間間隔
   r_interval = 3600 * 24 * 4
-  # あるドメインのリソースへのアクセスは 20個以内
-  max_access = 20
-  # アクセスするドメインは 80個
+
+  # あるドメインのリソースへのアクセスは 25個以内
+  max_access = 25
+
+  # アクセスするドメインは先頭70個を選ぶ
   max_domain = 70
 
+  # コンテンツにアクセスするときのwait
   c_interval = 5
 
+  # 接続要求出して待つ時間
   timeout = 15
+  
+  # User-Agent は IE9
+  useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
 
   def __init__(self):
     self.db = DB(host,user,passwd)
@@ -313,20 +272,12 @@ class Crawler:
       self.analyze(t.r_id,t.d_id,t.url)
       time.sleep(random.randint(1,self.c_interval))
 
-  def erase(self,r_id):
-    # db には html を返すであろうコンテンツしか登録しないけど
-    # もしそうでなかった場合のために r_id レコードをもつやつを削除する
-    self.db.delete(RMAPPER, "where r_id = %s" %r_id)
-    self.db.delete(DATA   , "where r_id = %s" %r_id)
-    self.db.delete(LINKR , "where r_id = %s" %r_id)
-    return
-
-
   # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
   def analyze(self,r_id,d_id,url):
     print "Acessing: %s" %url
     try:
-      connection = urllib2.urlopen(url,timeout=self.timeout)
+      req = urllib2.Request(url,"",{"User-Agent": self.useragent})
+      connection = urllib2.urlopen(req,timeout=self.timeout)
     except:
       logging.warning("can't connect url: %s" %url)
       return
@@ -334,14 +285,14 @@ class Crawler:
     # content-type が明示されていない若しくは
     # text/html でないなら DBから抹消
     if (not mtype) or (not mtype.startswith("text/html")):
-      self.erase(r_id)
+      self.db.erase(r_id)
       return
     html_raw_data = connection.read()
     
     try:
       (uni_title,uni_text,links) = HTMLAnalizer(url,mtype,html_raw_data).start()
     except:
-      self.erase(r_id)
+      self.db.erase(r_id)
       logging.warning("unparsible contents. erase r_id = %s from DB" %r_id)
       return
     self.save(r_id,d_id,uni_title,uni_text,links)
@@ -443,6 +394,6 @@ class Crawler:
 
 
 
-controller = Crawler()
-controller.d_interval = 3
-controller.crawl_forever()
+def crawl():
+  Crawler().crawl_forever()
+
