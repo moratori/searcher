@@ -111,16 +111,20 @@ class Indexer:
         # noun_list is unicode noun list! 
         (noun_list , cnt) = getnoun(data)
 
+
+        # cnt が 0 なのはおかしいのでそういうのは削除
         if cnt == 0:
-          # cnt が 0 なのはおかしいのでそういうのは削除
           self.db.erase(r_id)
+          continue
 
         # いままでに得られている 名詞のリストも考える
-        for (n_id,noun) in self.db.select(["n_id","noun"] , "nmapper"):
+        for (num , (n_id,noun)) in enumerate(self.db.select(["n_id","noun"] , "nmapper")):
           freq = (data.count(noun) / cnt)
           if freq == 0 : continue
           self.registfreq(n_id , r_id , freq)
           self.registplace(n_id , r_id , self.getoccurrence(noun,data))
+          if ((num % 1000) == 0) : self.db.commit()
+        self.db.commit()
 
         # data 自身が含んでいる名詞について考える
         for noun in noun_list:
@@ -159,3 +163,5 @@ def indexing():
     c.finish()
   return
 
+
+indexing()

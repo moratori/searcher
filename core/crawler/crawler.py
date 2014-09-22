@@ -180,40 +180,39 @@ class HTMLAnalizer(HTMLParser):
 
 
 
-
 class Crawler:
   
   # 同一domainにアクセスするのは 180sec ごのinterval
   # これがでかいと広く浅いcrawlになる
-  d_interval = 180
+  d_interval = 170
 
   # 同一リソースへのアクセスは最低 24 * 4時間間隔
   r_interval = 3600 * 24 * 4
 
   # あるドメインのリソースへのアクセスは 25個以内
-  max_access = 25
+  max_access = 20
 
   # アクセスするドメインは先頭70個を選ぶ
   max_domain = 70
 
   # コンテンツにアクセスするときのwait
-  c_interval = 5
+  c_interval = 4
 
   # 接続要求出して待つ時間
-  timeout = 15
+  timeout = 7
   
   # User-Agent は IE9
   useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
 
-  def __init__(self):
+  def __init__(self,dfilter=None):
     self.db = DB(host,user,passwd)
     self.db.open(db)
+    self.domainfilter = dfilter
 
-  def __nexttarget(self):
-    result = []
+
+  def __nexttarget_domain(self):
     now = int(time.time())
-
-    target= self.db.select(\
+    tmp = self.db.select(\
         ["d_id","name"] ,\
         DMAPPER ,\
         "as res" ,\
@@ -222,6 +221,14 @@ class Crawler:
         "and (not exists (select d_id from black where res.d_id = black.d_id))" ,\
         "order by rand()" ,\
         "limit %s" %self.max_domain)
+    return tmp if not self.domainfilter else filter(lambda x:self.domainfilter(x[1]) , tmp)
+
+
+  def __nexttarget(self):
+    result = []
+    now = int(time.time())
+
+    target= self.__nexttarget_domain()
 
     for (d_id , name) in target:
       cand = self.db.select(\
@@ -393,7 +400,10 @@ class Crawler:
 
 
 
-def crawl():
-  Crawler().crawl_forever()
+def crawl(f):
+  c = Crawler(f)
+  c.d_interval = 20
+  c.crawl_forever()
 
 
+crawl(lambda x:x.endswith("ac.jp"))
