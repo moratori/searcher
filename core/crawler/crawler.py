@@ -185,7 +185,7 @@ class Crawler:
   
   # 同一domainにアクセスするのは 180sec ごのinterval
   # これがでかいと広く浅いcrawlになる
-  d_interval = 200
+  d_interval = 180
 
   # 同一リソースへのアクセスは最低 24 * 4時間間隔
   r_interval = 3600 * 24 * 4
@@ -231,7 +231,6 @@ class Crawler:
           "((%s - vtime) > %s)" %(now,self.r_interval) ,\
           "order by counter asc" ,\
           "limit %s" %self.max_access)
-      # ここで最後に black list と white list みて制限しろ
       tmp = Node()
       for (r_id,path) in cand:
         tmp.add(Target(d_id,r_id , urlparse.urljoin(name,path)))
@@ -261,7 +260,7 @@ class Crawler:
       logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
     finally:
       self.finish()
-      sys.exit()
+    return 
  
 
   def crawl(self,node):
@@ -396,4 +395,5 @@ class Crawler:
 
 def crawl():
   Crawler().crawl_forever()
+
 

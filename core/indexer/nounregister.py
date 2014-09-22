@@ -4,6 +4,9 @@
 import MeCab
 import logging
 import math
+import traceback
+import time
+import datetime
 from searcher.core.db.sqlutil import *
 
 
@@ -46,6 +49,8 @@ def escape(text):
 
 
 class Indexer:
+
+  scoring_interval = 3600 * 24 * 14
 
   def __init__(self):
     self.db = DB(host,user,passwd)
@@ -99,37 +104,45 @@ class Indexer:
   def finish(self):
     self.db.close()
 
-  def indexing(self):
-    # ここの data　は unicode
-    for (r_id , data) in self.gettarget():
-      # noun_list is unicode noun list! 
-      (noun_list , cnt) = getnoun(data)
+  def indexing_forever(self):
+    while True:
+      # ここの data　は unicode
+      for (r_id , data) in self.gettarget():
+        # noun_list is unicode noun list! 
+        (noun_list , cnt) = getnoun(data)
 
-      # いままでに得られている 名詞のリストも考える
-      for (n_id,noun) in self.db.select(["n_id","noun"] , "nmapper"):
-        freq = (data.count(noun) / cnt)
-        if freq == 0 : continue
-        self.registfreq(n_id , r_id , freq)
-        self.registplace(n_id , r_id , self.getoccurrence(noun,data))
+        if cnt == 0:
+          # cnt が 0 なのはおかしいのでそういうのは削除
+          self.db.erase(r_id)
 
-      # data 自身が含んでいる名詞について考える
-      for noun in noun_list:
-        n_id = self.registnoun(noun.encode("utf-8"))
-        freq = (data.count(noun) / cnt)
-        if freq == 0 : continue
-        self.registfreq(n_id , r_id , freq)
-        self.registplace(n_id , r_id , self.getoccurrence(noun,data))
+        # いままでに得られている 名詞のリストも考える
+        for (n_id,noun) in self.db.select(["n_id","noun"] , "nmapper"):
+          freq = (data.count(noun) / cnt)
+          if freq == 0 : continue
+          self.registfreq(n_id , r_id , freq)
+          self.registplace(n_id , r_id , self.getoccurrence(noun,data))
 
-      self.indexed(r_id)
-      self.db.commit()
-    self.scoring()
+        # data 自身が含んでいる名詞について考える
+        for noun in noun_list:
+          n_id = self.registnoun(noun.encode("utf-8"))
+          freq = (data.count(noun) / cnt)
+          if freq == 0 : continue
+          self.registfreq(n_id , r_id , freq)
+          self.registplace(n_id , r_id , self.getoccurrence(noun,data))
+
+        self.indexed(r_id)
+        self.db.commit()
+      self.scoring()
+      time.sleep(3)
 
   def scoring(self):
     ((tot_data_num,),)= self.db.select("count(*)" , "data")
-    for (num , (n_id , r_id , tf)) in enumerate(self.db.select(["n_id","r_id","freq"] , "freq")):
+    now = int(time.time())
+    for (num , (n_id , r_id , tf)) in enumerate(self.db.select(["n_id","r_id","freq"] , "freq" , "where (tfidf is null) or ((%s - tstamp) > %s)" %(now,self.scoring_interval))):
       ((noun_included_num,),) = self.db.select("count(*)" , "freq" , "where n_id = %s" %n_id)
       idf = math.log(tot_data_num/float(noun_included_num),2)
-      self.db.update("freq",[("tfidf" , tf * idf)] , "where (n_id = %s) and (r_id = %s)" %(n_id,r_id))
+      now = int(time.time())
+      self.db.update("freq",[("tfidf" , tf * idf),("tstamp",now)] , "where (n_id = %s) and (r_id = %s)" %(n_id,r_id))
       # 1000 件毎に commit する. 毎回 commit してたら阿呆みたいに遅くなるので
       if ((num % 1000) == 0) : self.db.commit()
     self.db.commit()
@@ -139,9 +152,10 @@ class Indexer:
 def indexing():
   c = Indexer()
   try:
-    c.indexing()
-  except:pass
+    c.indexing_forever()
+  except:
+    logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")  
   finally:
     c.finish()
-
+  return
 

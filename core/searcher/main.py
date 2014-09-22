@@ -114,7 +114,7 @@ class Searcher(DB):
     result.reverse()
     return result
 
-    
+
   def search_and(self , query):
     # query は Python unicode で 検索窓に入力された、半角|全角スペースで区切られた文字列
     (phrase_dic , flat_nlist) = self.split(query)
@@ -128,5 +128,4 @@ class Searcher(DB):
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
     return self.scoring_and(tmp)
-
 

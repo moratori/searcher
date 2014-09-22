@@ -51,6 +51,7 @@ freq
 | n_id  | int(11) | NO   | PRI | 0       |       |
 | r_id  | int(11) | NO   | PRI | 0       |       |
 | freq  | int(11) | YES  |     | NULL    |       |
+| tfidf | float   | YES  |     | NULL    |       |
 +-------+---------+------+-----+---------+-------+
 
 
