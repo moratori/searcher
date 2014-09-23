@@ -129,3 +129,5 @@ class Searcher(DB):
       tmp.append(rlist)
     return self.scoring_and(tmp)
 
+
+print Searcher().search_and(u"大山実")

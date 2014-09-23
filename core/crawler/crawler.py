@@ -58,8 +58,11 @@ def getdname(link):
 def getpath(link):
   path = link.path
   query = link.query
-  result = ((path if query == "" else path + query).encode("utf-8"))
+  result = ((path if query == "" else path + "?" + query).encode("utf-8"))
   return "/" if result == "" else result
+
+def qescape(text):
+  return re.sub(re.compile("[\"\'\\\]"),"",text)
 
 def escape(text):
   # utf-8 な文字列しかできない
@@ -186,10 +189,10 @@ class Crawler:
   # これがでかいと広く浅いcrawlになる
   d_interval = 170
 
-  # 同一リソースへのアクセスは最低 24 * 4時間間隔
-  r_interval = 3600 * 24 * 4
+  # 同一リソースへのアクセスは最低 24 * 5時間間隔
+  r_interval = 3600 * 24 * 5
 
-  # あるドメインのリソースへのアクセスは 25個以内
+  # あるドメインのリソースへのアクセスは 20個以内
   max_access = 20
 
   # アクセスするドメインは先頭70個を選ぶ
@@ -199,7 +202,7 @@ class Crawler:
   c_interval = 4
 
   # 接続要求出して待つ時間
-  timeout = 7
+  timeout = 6
   
   # User-Agent は IE9
   useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
@@ -252,17 +255,16 @@ class Crawler:
     return roots
 
 
-  def crawl_forever(self):
-    roots = self.polling()
+  def crawl_toplevel(self):
+    roots = self.__nexttarget()
     try:
-      while True:
-        while roots:
-          ## ここの node らへんをマルチスレッドでアクセスする
-          node = roots.pop()
-          self.crawl(node)
-          # commit の粒度が荒い気がする
-          self.db.commit()
-        roots.extend(self.polling())
+      while roots:
+        ## ここの node らへんをマルチスレッドでアクセスする
+        node = roots.pop()
+        self.crawl(node)
+        # commit の粒度が荒い気がする
+        self.db.commit()
+        roots.extend(self.__nexttarget())
     except:
       logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
     finally:
@@ -347,7 +349,7 @@ class Crawler:
     for link in links: 
       d_id  = self.db.revlookup_dname(getdname(link))
       assert (d_id)
-      path = getpath(link)
+      path = qescape(getpath(link))
       cand = get_indexcand(path)
       already = self.db.exists_rmapper(d_id,cand)
       if not already:
@@ -402,8 +404,10 @@ class Crawler:
 
 def crawl(f):
   c = Crawler(f)
-  c.d_interval = 20
-  c.crawl_forever()
+  c.d_interval = 14
+  c.c_interval = 5
+  c.crawl_toplevel()
 
 
-crawl(lambda x:x.endswith("ac.jp"))
+if __name__ == "__main__" :
+  crawl(lambda x:x.endswith(".dendai.ac.jp"))
