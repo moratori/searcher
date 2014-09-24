@@ -116,7 +116,6 @@ class HTMLAnalizer(HTMLParser):
        "css","js","xml","txt","exe","csv"]) 
 
   exclude_extension = exclude_extension.union(set([each.upper() for each in exclude_extension]))
-  print exclude_extension
 
 
   def __init__(self,url,mtype,rawhtmldata):
