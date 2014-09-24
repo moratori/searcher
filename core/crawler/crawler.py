@@ -286,17 +286,17 @@ class Crawler:
     try:
       req = urllib2.Request(url,"",{"User-Agent": self.useragent})
       connection = urllib2.urlopen(req,timeout=self.timeout)
+      mtype = connection.info().getheader("Content-Type")
+      # content-type が明示されていない若しくは
+      # text/html でないなら DBから抹消
+      if (not mtype) or (not mtype.startswith("text/html")):
+        self.db.erase(r_id)
+        return
+      html_raw_data = connection.read()
     except:
       logging.warning("can't connect url: %s" %url)
       return
-    mtype = connection.info().getheader("Content-Type")
-    # content-type が明示されていない若しくは
-    # text/html でないなら DBから抹消
-    if (not mtype) or (not mtype.startswith("text/html")):
-      self.db.erase(r_id)
-      return
-    html_raw_data = connection.read()
-    
+   
     try:
       (uni_title,uni_text,links) = HTMLAnalizer(url,mtype,html_raw_data).start()
     except:
