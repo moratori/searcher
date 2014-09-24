@@ -110,12 +110,13 @@ class HTMLAnalizer(HTMLParser):
 
   exclude_extension = \
      set(["jpg","jpeg","png","gif","ico","bmp",\
-       "wmv","wma","wma","wav","mp4","mp3","mid","midi","mov","mpg","mpeg","avi",".swf" ,\
+       "wmv","wma","wma","wav","mp4","mp3","mid","midi","mov","mpg","mpeg","avi","swf" ,\
        "xls","xlsx","doc","docx","ppt","pptx","pdf",\
        "zip","rar","lzh","gz","z","cab",\
        "css","js","xml","txt","exe","csv"]) 
 
-  exclude_extension = exclude_extension.union(set(["." + each for each in exclude_extension]))
+  exclude_extension = exclude_extension.union(set([each.upper() for each in exclude_extension]))
+  print exclude_extension
 
 
   def __init__(self,url,mtype,rawhtmldata):
