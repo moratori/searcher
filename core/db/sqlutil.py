@@ -83,6 +83,14 @@ class DB(Sqlutil):
     Sqlutil.__init__(self,host,user,passwd)
 
 
+  def lookup_url(self,r_id):
+    path_result = self.select(["d_id","path"] , "rmapper" , "where r_id = %s" %r_id)
+    (d_id,path) = path_result[0]
+    domain_result = self.select("name" , "dmapper" , "where d_id = %s" %d_id)
+    (name,) = domain_result[0]
+    return (name,path)
+
+
   def revlookup_dname(self,dname):
     result = self.select("d_id" , DMAPPER , "where name = \"%s\"" %dname)
     if not result : return None

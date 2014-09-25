@@ -5,6 +5,7 @@ import MeCab
 import logging
 import math
 import re
+import urlparse
 from searcher.core.db.sqlutil import *
 
 
@@ -129,5 +130,18 @@ class Searcher(DB):
       tmp.append(rlist)
     return self.scoring_and(tmp)
 
+  # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
+  # 本文の要約をつくる関数
+  def search_and_toplevel(self,query,digestmaker = None):
+    result = []
+    # unicode もじの url,title,data を返す
+    for r_id in self.search_and(query):
+      tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
+      (title,data) = tmp[0]
+      (domain,path) = self.db.lookup_url(r_id)
+      url = urlparse.urljoin(domain,path)
+      tmp = data if not digestmaker else digestmaker(query,data)
+      result.append((url,title,tmp))
+    return result
 
-print Searcher().search_and(u"大山実")
+

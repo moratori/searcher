@@ -118,14 +118,17 @@ class Indexer:
         continue
 
       # いままでに得られている 名詞のリストも考える
-      for (n_id,noun) in (self.db.select(["n_id","noun"] , "nmapper")):
+      # わざわざここで データベースから 名詞一覧を毎回もってこなくても
+      # 追加分だけ Python側で 持っとけば必要ないな -> 何万もの名詞のリストをもっとくのは きつくないか?
+      for (num , (n_id,noun)) in enumerate(self.db.select(["n_id","noun"] , "nmapper")):
         freq = (data.count(noun) / cnt)
         if freq == 0 : 
           continue
         else:
           self.registfreq(n_id , r_id , freq)
           self.registplace(n_id , r_id , self.getoccurrence(noun,data))
-          self.db.commit()
+          if ((num % 300) == 0):self.db.commit()
+        self.db.commit()
 
       # data 自身が含んでいる名詞について考える
       for noun in noun_list:
@@ -150,8 +153,8 @@ class Indexer:
       idf = math.log(tot_data_num/float(noun_included_num),2)
       now = int(time.time())
       self.db.update("freq",[("tfidf" , tf * idf),("tstamp",now)] , "where (n_id = %s) and (r_id = %s)" %(n_id,r_id))
-      # 100 件毎に commit する. 毎回 commit してたら阿呆みたいに遅くなるので
-      if ((num % 100) == 0) : self.db.commit()
+      # 300 件毎に commit する. 毎回 commit してたら阿呆みたいに遅くなるので
+      if ((num % 300) == 0) : self.db.commit()
     self.db.commit()
 
 
