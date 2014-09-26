@@ -144,4 +144,3 @@ class Searcher(DB):
       result.append((url,title,tmp))
     return result
 
-

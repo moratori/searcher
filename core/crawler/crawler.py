@@ -29,7 +29,7 @@ db      = "searcher"
 host    = "localhost"
 
 
-logging.basicConfig(filename="/home/moratori/Github/searcher/core/crawler/crawler.log")
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler.log")
 (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
@@ -404,7 +404,7 @@ class Crawler:
 
 def crawl(f):
   c = Crawler(f)
-  c.d_interval = 14
+  c.d_interval = 12
   c.c_interval = 5
   c.crawl_toplevel()
 

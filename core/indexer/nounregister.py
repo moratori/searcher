@@ -14,7 +14,7 @@ from searcher.core.db.sqlutil import *
 host = "localhost"
 db = "searcher"
 
-logging.basicConfig(filename="/home/moratori/Github/searcher/core/indexer/indexer.log")
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/indexer.log")
 (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
@@ -113,7 +113,7 @@ class Indexer:
       (noun_list , cnt) = getnoun(data)
 
       # sigma(s<-d ,  tf(s,d)) を求める。これが分母となる
-      summing_tf = sum([data.count(noun) for noun in noun_list])
+      summing_tf = float(sum([data.count(noun) for noun in noun_list]))
 
       # cnt が 0 なのはおかしいのでそういうのは削除
       if cnt == 0:
