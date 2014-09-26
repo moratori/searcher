@@ -144,3 +144,4 @@ class Searcher(DB):
       result.append((url,title,tmp))
     return result
 
+print Searcher().search_and(u"理工学部")
