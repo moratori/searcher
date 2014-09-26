@@ -1,3 +1,3 @@
 #!/bin/sh
 
-mysql -p -u root < init.sql
+mysql -p -u root < initall.sql
