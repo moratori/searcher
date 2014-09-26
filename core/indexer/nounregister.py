@@ -112,6 +112,9 @@ class Indexer:
       # noun_list is unicode noun list! 
       (noun_list , cnt) = getnoun(data)
 
+      # sigma(s<-d ,  tf(s,d)) を求める。これが分母となる
+      summing_tf = sum([data.count(noun) for noun in noun_list])
+
       # cnt が 0 なのはおかしいのでそういうのは削除
       if cnt == 0:
         self.db.erase(r_id)
@@ -121,7 +124,7 @@ class Indexer:
       # わざわざここで データベースから 名詞一覧を毎回もってこなくても
       # 追加分だけ Python側で 持っとけば必要ないな -> 何万もの名詞のリストをもっとくのは きつくないか?
       for (num , (n_id,noun)) in enumerate(self.db.select(["n_id","noun"] , "nmapper")):
-        freq = (data.count(noun) / cnt)
+        freq = (data.count(noun) / summing_tf)
         if freq == 0 : 
           continue
         else:
@@ -133,7 +136,7 @@ class Indexer:
       # data 自身が含んでいる名詞について考える
       for noun in noun_list:
         n_id = self.registnoun(noun.encode("utf-8"))
-        freq = (data.count(noun) / cnt)
+        freq = (data.count(noun) / summing_tf)
         if freq == 0 : 
           continue
         else:
