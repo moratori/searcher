@@ -112,13 +112,15 @@ class Indexer:
       # noun_list is unicode noun list! 
       (noun_list , cnt) = getnoun(data)
 
-      # sigma(s<-d ,  tf(s,d)) を求める。これが分母となる
-      summing_tf = float(sum([data.count(noun) for noun in noun_list]))
+      len_nlist = len(noun_list)
 
-      # cnt が 0 なのはおかしいのでそういうのは削除
-      if cnt == 0:
+      # 名詞がないリソースはいらない
+      if (len_nlist == 0) or (cnt == 0):
         self.db.erase(r_id)
         continue
+
+      # avg(s<-d ,  tf(s,d)) を求める。これが分母となる
+      summing_tf = sum([data.count(noun) for noun in noun_list])/float(len_nlist)
 
       # いままでに得られている 名詞のリストも考える
       # わざわざここで データベースから 名詞一覧を毎回もってこなくても

@@ -13,7 +13,7 @@ from searcher.core.db.sqlutil import *
 host = "localhost"
 db = "searcher"
 
-logging.basicConfig(filename="/home/moratori/Github/searcher/core/indexer/indexer.log")
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/indexer.log")
 (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
