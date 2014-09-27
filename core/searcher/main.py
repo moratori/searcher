@@ -13,7 +13,7 @@ from searcher.core.db.sqlutil import *
 host = "localhost"
 db = "searcher"
 
-logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/indexer.log")
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/searcher.log")
 (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
@@ -128,20 +128,19 @@ class Searcher(DB):
       # ここで n_id をappend してないので n_id は落ちてしまう
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
-    return self.scoring_and(tmp)
+    return (self.scoring_and(tmp) , flat_nlist)
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
   def search_and_toplevel(self,query,digestmaker = None):
     result = []
     # unicode もじの url,title,data を返す
-    for r_id in self.search_and(query):
+    sres = self.search_and(query)
+    for r_id in sres[0]:
       tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
       (title,data) = tmp[0]
       (domain,path) = self.db.lookup_url(r_id)
       url = urlparse.urljoin(domain,path)
-      tmp = data if not digestmaker else digestmaker(query,data)
-      result.append((url,title,tmp))
+      result.append((url,title,(data if not digestmaker else digestmaker(sres[1],data))))
     return result
 
-print Searcher().search_and(u"理工学部")

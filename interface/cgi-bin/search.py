@@ -6,6 +6,7 @@ import cgitb
 import os
 import sys
 import searcher.core.searcher.main as s;
+import time
 
 
 cgitb.enable()
@@ -44,20 +45,28 @@ def newline(data):
       s += c
   return s
 
+# text に含まれるキーワドをふと文字にし
+# 長さを 先頭180文字くらいにする
+def keyword_bold(queries,text,l = 200):
+  # テキストは unicode
+  tmp = newline(text[0:l] if len(text) > l else text)
+  return (reduce(lambda r,x:r.replace(x,u"<B>" + x + u"</B>") ,queries , tmp))
 
 def search(query):
   # query は unicode
   c = s.Searcher()
-  res = c.search_and_toplevel(query,lambda q,d: (d if len(d) < 180 else d[0:179]))
+  start = time.time()
+  res = c.search_and_toplevel(query,keyword_bold)
+  interval = time.time() - start
   num = len(res)
   if num == 0:
-    print "<br>「%s」を含む文書は見つかりませんでした。" %(query.encode("utf-8"))
+    print "<br>「%s」を含むウェブページは見つかりませんでした。" %(query.encode("utf-8"))
   else:
-    print "%s件のヒット<br>" %(num)
+    print "「%s」の検索結果 %s件のヒット( %.4f 秒 )<br>" %(query.encode("utf-8") , num , interval)
     for (url,title,data) in res:
       url = url.encode("utf-8")
       title = title.encode("utf-8")
-      data = newline(data).encode("utf-8")
+      data = data.encode("utf-8")
       print "<br>"
       print "<a href = \"%s\" target = \"_blank\">%s</a><br>" %(url , title)
       print "<font size = \"2\" color = \"green\">%s</font>" %(url)
