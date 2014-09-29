@@ -144,12 +144,12 @@ class Indexer:
         else:
           self.registfreq(n_id , r_id , freq)
           self.registplace(n_id , r_id , self.getoccurrence(noun,data))
-
       self.indexed(r_id)
       self.db.commit()
 
   # socring は data や freq テーブルが変更されたなら、
   # 毎回行われるべきである
+  # tfidf 値を求めて、freqテーブルのtfidfカラムにぶち込む
   def scoring(self):
     ((tot_data_num,),)= self.db.select("count(*)" , "data")
     now = int(time.time())
@@ -162,13 +162,56 @@ class Indexer:
       if ((num % 300) == 0) : self.db.commit()
     self.db.commit()
 
+  # PageRankで ランク付けを行う
+  def __pageranking(self,network,initscore = 100.0,limit=7):
+    nodes = network.keys()
+    result = {node: initscore for node in nodes}
+    for d in range(limit):
+      tmp = {node:0 for node in nodes}
+      for node in nodes:
+        length = len(network[node])
+        # もし出ていく方向のリンクが0なら
+        if length == 0 : continue
+        out = result[node] / length 
+        for c in network[node]:
+          # C は必ずしもtmpにない可能性がある?
+          if c in tmp:tmp[c] += out
+        result[node] = 0
+      result = tmp
+    return result
+
+  # page rank によるウェブページのランク付けを行う
+  def pagerank_toplevel(self):
+    network = {}
+    init = None
+    for (r_id,num,child) in self.db.select("*","linkr"):
+      if (init is None) or (r_id != init):
+        if not (init is None):
+          network[init] = tmp
+        tmp = []
+        unique = set()
+      init = r_id
+      if not child in unique:
+        tmp.append(child)
+        unique.add(child) 
+    ranking = self.__pageranking(network)
+    # 後は このranking をテーブルにぶち込めばいい
+    for (num, node)in enumerate(ranking.keys()):
+      self.db.insert("pagerank" , [node,float("%.5f" %ranking[node])])
+      if (num % 300) == 0 : self.db.commit()
+    self.db.commit()
 
 
 def indexing():
   c = Indexer()
   try:
+    # 名詞あつめて nmapper に登録
+    # place テーブルにも出現位置とかいれる
     c.indexing()
+    # 各名詞とウェブページに対するTFIDFを計算する
     c.scoring()
+    # PageRankを計算する 
+    c.pagerank_toplevel()
   except:
     logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")  
   finally:
@@ -177,5 +220,6 @@ def indexing():
 
 
 if __name__ == "__main__" :
-  indexing()
+  #indexing()
+  Indexer().pagerank_toplevel()
   

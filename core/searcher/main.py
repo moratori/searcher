@@ -93,6 +93,10 @@ class Searcher(DB):
           res_unique.append(noun)
     return res_dic , res_unique
 
+
+  # 後にページランクの値でもソートする
+  # tfidfのリストをてきそうな個数ずつにわけて(3とか)
+  # でその中をソートする
   def scoring_and(self,pages):
     # pages = [((r_id , tfidf),...) , ...]
     # r_id のリストを返す(もちろんtfidf値でソートされた順)
@@ -113,6 +117,33 @@ class Searcher(DB):
     # スコアを元にr_id をソートする
     result = sorted(result_dic.keys(),key=lambda x: result_dic[x])
     result.reverse()
+    # ここで最後にpagerankでもソートする
+    #return result
+    return self.__pageranking(result)
+
+
+  def getrank(self,r_id):
+    # r_id の PageRankを得る
+    # PageRank テーブルに存在しない場合は 0 をかえせばいい
+    res = self.db.select("rank" , "pagerank" , "where r_id = %s" %r_id)
+    if not res: return 0
+    return res[0][0]
+
+  # ページランク表より r_id のリストをソートする
+  def __pageranking(self,r_id_list):
+    n = 3
+    # ここの n のあたいでtfidfでソートされてるリストをブロックにわけて
+    # そのなかでpagerankによりソートする
+    l = len(r_id_list)
+    target = zip(*[iter(r_id_list)] * n)
+    if (l % n != 0):
+      target.append(r_id_list[-(l%n):])
+    target = map(list,target)
+    result = []
+    for container in target:
+      # container を ソートしてフラットにしたものを result に追加してく
+      for r_id in reversed(sorted(container , key=lambda r_id: self.getrank(r_id))):
+        result.append(r_id)
     return result
 
 
