@@ -74,7 +74,7 @@ class Searcher(DB):
 
   def split(self,query):
     # query は Python unicode
-    # query = "情報環境学部 情報通信サービス研究室 研究内容"
+    # query = "情報環境学部 情報通信サービス研究室 研究内容"みたいなの
     # -> {"情報環境学部": ["情報","環境","学部"] , "情報通信サービス研究室": ["情報","通信","サービス","研究","室"] , "研究内容": ["研究","内容"]}
     #    ["情報","環境","学部","通信","サービス","研究","室"]
     # フレーズ検索を加味したいのならば初めの返却値の辞書をかんがえてやれば良いと思うけども
@@ -98,7 +98,7 @@ class Searcher(DB):
   # tfidfのリストをてきそうな個数ずつにわけて(3とか)
   # でその中をソートする
   def scoring_and(self,pages):
-    # pages = [((r_id , tfidf),...) , ...]
+    # pages = [(r_id , tfidf) , ...]
     # r_id のリストを返す(もちろんtfidf値でソートされた順)
     data = map(dict,pages)
     result_dic = {}

@@ -199,7 +199,7 @@ class Crawler:
   max_domain = 70
 
   # コンテンツにアクセスするときのwait
-  c_interval = 4
+  c_interval = 3
 
   # 接続要求出して待つ時間
   timeout = 6
@@ -262,8 +262,6 @@ class Crawler:
         ## ここの node らへんをマルチスレッドでアクセスする
         node = roots.pop()
         self.crawl(node)
-        # commit の粒度が荒い気がする
-        self.db.commit()
         roots.extend(self.__nexttarget())
     except:
       logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
@@ -278,6 +276,8 @@ class Crawler:
     for t in node.container:
       self.stamp(t.d_id,t.r_id)
       self.analyze(t.r_id,t.d_id,t.url)
+      # 1URLアクセスするごとに commit することにした
+      self.db.commit()
       time.sleep(random.randint(1,self.c_interval))
 
   # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
