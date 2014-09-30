@@ -220,6 +220,5 @@ def indexing():
 
 
 if __name__ == "__main__" :
-  #indexing()
-  Indexer().pagerank_toplevel()
+  indexing()
   
