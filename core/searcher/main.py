@@ -72,6 +72,55 @@ class Searcher(DB):
     ((n_id,),) = tmp
     return n_id , self.db.select(["r_id" , "tfidf"] , "freq" , "where n_id = %s" %n_id)
 
+
+
+
+
+
+
+  def __count_phrase(self,r_id,phrase):
+    # r_id で表される文書に phrase が何回出現するかを返す
+    (word,splited) = phrase
+    # ("情報環境学部" , ["情報" , "環境" , "学部"])
+    n_ids = []
+    phrase = []
+    for noun in splited:
+      # ここで noun はかならず nmapper に存在する
+      # 存在しないやつは search_andメソッドのreturn で帰ってるから
+      n_id = self.db.select("n_id" , "nmapper" , "where noun = \"%s\"" %noun)[0][0]
+      tmp = self.db.select("place" , "place", "where (n_id = %s) and (r_id = %s) order by asc" %(n_id,r_id))
+      phrase.append((len(noun) , [place for (place,) in tmp]))
+      # phrase = [(2,[1,2,3,4,6,3,2,1]) , (2,[4,3,2,5,1,5,3]) ...]
+      # ここの phrase 変数は フレーズを１つ表している "情報環境学部" とか
+    def countphrase_main(lis):
+      if not lis or len(lis) == 1: return 0
+      def path(index , l):
+        if not l: return True
+        (length , c) = l[0]
+        return path(length+index,l[1:]) if sorted_in(index , c) else False
+      ((length , root) , res) = (lis[0] , 0)
+      for start in root:
+        if path(start+length,lis[1:]):res += 1
+      return res
+    return countphrase_main(phrase)
+
+  def __phrase_sort(self,r_id_list,phrase_dic):
+    # ここのr_id_listはtfidf値を元にソートされたr_idのリスト
+    # 各 r_id は phrase_dic から生成される noun のフラットリストの名詞を全て含んでいる
+    # これらはソートはされているけど、形態素の出現頻度を元に評価されただけだから
+    # フレーズでもソートしてやる -> どうやって?
+    
+    # pjrase_dic とかいって {"就職": ["就職"] , "情報": ["情報"]}
+    # みたいな辞書だったら フレーズソートするいみないよね　
+    if every(lambda k: len(phrase_dic[k]) == 1, phrase_dic.keys()) : 
+      return r_id_list
+    else:
+      return r_id_list
+
+
+
+
+
   def split(self,query):
     # query は Python unicode
     # query = "情報環境学部 情報通信サービス研究室 研究内容"みたいなの
@@ -93,11 +142,10 @@ class Searcher(DB):
           res_unique.append(noun)
     return res_dic , res_unique
 
-
   # 後にページランクの値でもソートする
   # tfidfのリストをてきそうな個数ずつにわけて(3とか)
   # でその中をソートする
-  def scoring_and(self,pages):
+  def sort_and(self,pages,phrase_dic):
     # pages = [(r_id , tfidf) , ...]
     # r_id のリストを返す(もちろんtfidf値でソートされた順)
     data = map(dict,pages)
@@ -117,9 +165,8 @@ class Searcher(DB):
     # スコアを元にr_id をソートする
     result = sorted(result_dic.keys(),key=lambda x: result_dic[x])
     result.reverse()
-    # ここで最後にpagerankでもソートする
-    #return result
-    return self.__pageranking(result)
+    # ここで最後にpagerankとフレーズでソートする
+    return self.__pageranking(self.__phrase_sort(result , phrase_dic))
 
 
   def getrank(self,r_id):
@@ -155,11 +202,13 @@ class Searcher(DB):
     tmp = []
     for noun in flat_nlist:
       (n_id , rlist) = self.search_word(noun)
-      if (not n_id) or (not rlist):continue
+      # nmapper に存在しないような名詞だったら n_id はNone に成るわけだけど
+      # そうなったら 検索結果は存在しない and 検索だから
+      if (not n_id) or (not rlist): return ([],[])
       # ここで n_id をappend してないので n_id は落ちてしまう
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
-    return (self.scoring_and(tmp) , flat_nlist)
+    return (self.sort_and(tmp,phrase_dic) , flat_nlist)
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数

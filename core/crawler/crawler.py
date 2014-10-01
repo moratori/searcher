@@ -353,6 +353,9 @@ class Crawler:
       cand = get_indexcand(path)
       already = self.db.exists_rmapper(d_id,cand)
       if not already:
+        # ここで 新しいキーをもらえるはずなのに
+        # duplicateでprimary key の制約に違反しておちてるケースが
+        # ログにあった
         new_r_id = self.db.next_r_id()
         self.db.insert(RMAPPER , [new_r_id , d_id , path , 0 , 0])
         child_r_ids.append(new_r_id)
