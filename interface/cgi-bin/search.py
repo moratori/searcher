@@ -63,12 +63,12 @@ def search(query):
     print "<br>「%s」を含むウェブページは見つかりませんでした。" %(query.encode("utf-8"))
   else:
     print "「%s」の検索結果 %s件のヒット( %.4f 秒 )<br>" %(query.encode("utf-8") , num , interval)
-    for (url,title,data) in res:
+    for (number , (url,title,data)) in enumerate(res):
       url = url.encode("utf-8")
       title = title.encode("utf-8")
       data = data.encode("utf-8")
       print "<br>"
-      print "<a href = \"%s\" target = \"_blank\">%s</a><br>" %(url , title)
+      print "%s　<a href = \"%s\" target = \"_blank\">%s</a><br>" %(number+1,url , title)
       print "<font size = \"2\" color = \"green\">%s</font>" %(url)
       print "<font size = \"2\">%s</font>" %(data)
       print "<br>"

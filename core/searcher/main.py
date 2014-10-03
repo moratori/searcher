@@ -41,6 +41,20 @@ def sorted_in(elm,lst):
 
 
 
+def avg_mergesort(a,b,siglevel = 0.6):
+  length = float(len(a))
+  dic ={}
+  for (index , elm) in enumerate(a):
+    pair_index = b.index(elm)
+    diff = abs(pair_index - index)/length
+    if diff > siglevel:
+      dic[elm] = min(index,pair_index)
+    else:
+      dic[elm] = (index + pair_index)/2.0
+  return sorted(a,key = lambda x: dic[x])
+
+
+
 def getnoun(text):
   # 返すのはunicode型の名詞のリスト
   # と 重複を除去しなかった場合の名詞の数
@@ -83,9 +97,6 @@ class Searcher(DB):
 
 
 
-
-
-
   def __count_phrase(self,r_id,word,splited):
     # r_id で表される文書に phrase が何回出現するかを返す
     # ("情報環境学部" , ["情報" , "環境" , "学部"])
@@ -95,7 +106,7 @@ class Searcher(DB):
       # ここで noun はかならず nmapper に存在する
       # 存在しないやつは search_andメソッドのreturn で帰ってるから
       n_id = self.db.select("n_id" , "nmapper" , "where noun = \"%s\"" %noun)[0][0]
-      tmp = self.db.select("place" , "place", "where (n_id = %s) and (r_id = %s) order by asc" %(n_id,r_id))
+      tmp = self.db.select("place" , "place", "where (n_id = %s) and (r_id = %s) order by place asc" %(int(n_id),int(r_id)))
       phrase.append((len(noun) , [place for (place,) in tmp]))
       # phrase = [(2,[1,2,3,4,6,3,2,1]) , (2,[4,3,2,5,1,5,3]) ...]
       # ここの phrase 変数は フレーズを１つ表している "情報環境学部" とか
@@ -126,7 +137,13 @@ class Searcher(DB):
       for r_id in r_id_list:
         for (phrase , splited) in phrase_dic.items():
           # phrase の長さと 出現回数の積を得点にしよう
-          value = len(phrase) * self.__count_phrase(r_id , phrase , splited)
+          # やっぱり純粋なカウントだと(要するにフレーズ版のTF)よろしくない
+          # スクールバス 情報環境学部 で検索して 情報環境学部だけ多く含む文書がきてしまう ...
+          # やっぱり カウントはあんま考慮しないように log かけてしまおう?
+          # 本当ならフレーズ版の TFIDF　を作りたいけどそれかなり大変だなー
+          # データベースの定義からおおきくいろいろ変えないといけなくなりそう ... 
+          # 長い語であっても特定的でないヤツはある? -> 情報環境学部とか
+          value = len(phrase) *  self.__count_phrase(r_id , phrase , splited)
           if r_id in res:
             res[r_id] += value
           else:
@@ -134,8 +151,6 @@ class Searcher(DB):
       result = sorted(r_id_list , key = lambda x: res[x])
       result.reverse()
       return result
-
-
 
 
 
@@ -161,11 +176,9 @@ class Searcher(DB):
           res_unique.append(noun)
     return res_dic , res_unique
 
-  # 後にページランクの値でもソートする
-  # tfidfのリストをてきそうな個数ずつにわけて(3とか)
-  # でその中をソートする
+
   def __tfidf_sort(self,pages):
-    # pages = [(r_id , tfidf) , ...]
+    # pages = [((r_id , tfidf), ... ) , ...]
     # r_id のリストを返す(もちろんtfidf値でソートされた順)
     data = map(dict,pages)
     result_dic = {}
@@ -187,9 +200,18 @@ class Searcher(DB):
     return result
 
 
-  def sort_toplevel(self , r_id_list , phrase_dic):
-    return self.__pagerank_sort(self.__tfidf_sort(r_id_list))
+  def sort_toplevel(self , pages , phrase_dic):
+    # pages = [((r_id1 , tfidf) , (r_id2 , tfidf), ...) , ... , ]
+    # 各要素は pages[i] はキーワード K_i で検索した時にそれを含むページとそれのtfidf値のリスト
+    # 効率化のために __tfidf_sort 部分でtfidfで重みを付けるのと加えて and 処理までしてしまっている　
+    # なので 後に続く ソート処理は tfidf_sort が返した結果に大してしかできないね...
 
+
+    # 何もいじらず TFIDF値を求めただけのやつが一番うまく行くのでは....
+    tfidf_sorted  = self.__tfidf_sort(pages)
+    phrase_sorted = self.__phrase_sort(tfidf_sorted , phrase_dic) 
+    result = avg_mergesort(tfidf_sorted , phrase_sorted)
+    return self.__pagerank_sort(result)
 
   def getrank(self,r_id):
     # r_id の PageRankを得る
@@ -197,6 +219,7 @@ class Searcher(DB):
     res = self.db.select("rank" , "pagerank" , "where r_id = %s" %r_id)
     if not res: return 0
     return res[0][0]
+
 
   # ページランク表より r_id のリストをソートする
   # 但しこのソートはかなり特殊で n で限られたブロックの中しかソートしない
