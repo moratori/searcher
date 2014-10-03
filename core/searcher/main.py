@@ -32,6 +32,14 @@ def every(f,s):
     if not f(each):return False
   return True
 
+def sorted_in(elm,lst):
+  if not lst:return False
+  for each in lst:
+    if each > elm : return False
+    if each == elm : return True
+  return False
+
+
 
 def getnoun(text):
   # 返すのはunicode型の名詞のリスト
@@ -78,9 +86,8 @@ class Searcher(DB):
 
 
 
-  def __count_phrase(self,r_id,phrase):
+  def __count_phrase(self,r_id,word,splited):
     # r_id で表される文書に phrase が何回出現するかを返す
-    (word,splited) = phrase
     # ("情報環境学部" , ["情報" , "環境" , "学部"])
     n_ids = []
     phrase = []
@@ -115,7 +122,19 @@ class Searcher(DB):
     if every(lambda k: len(phrase_dic[k]) == 1, phrase_dic.keys()) : 
       return r_id_list
     else:
-      return r_id_list
+      res = {}
+      for r_id in r_id_list:
+        for (phrase , splited) in phrase_dic.items():
+          # phrase の長さと 出現回数の積を得点にしよう
+          value = len(phrase) * self.__count_phrase(r_id , phrase , splited)
+          if r_id in res:
+            res[r_id] += value
+          else:
+            res[r_id]  = value
+      result = sorted(r_id_list , key = lambda x: res[x])
+      result.reverse()
+      return result
+
 
 
 
@@ -145,7 +164,7 @@ class Searcher(DB):
   # 後にページランクの値でもソートする
   # tfidfのリストをてきそうな個数ずつにわけて(3とか)
   # でその中をソートする
-  def sort_and(self,pages,phrase_dic):
+  def __tfidf_sort(self,pages):
     # pages = [(r_id , tfidf) , ...]
     # r_id のリストを返す(もちろんtfidf値でソートされた順)
     data = map(dict,pages)
@@ -165,8 +184,11 @@ class Searcher(DB):
     # スコアを元にr_id をソートする
     result = sorted(result_dic.keys(),key=lambda x: result_dic[x])
     result.reverse()
-    # ここで最後にpagerankとフレーズでソートする
-    return self.__pageranking(self.__phrase_sort(result , phrase_dic))
+    return result
+
+
+  def sort_toplevel(self , r_id_list , phrase_dic):
+    return self.__pagerank_sort(self.__tfidf_sort(r_id_list))
 
 
   def getrank(self,r_id):
@@ -177,7 +199,8 @@ class Searcher(DB):
     return res[0][0]
 
   # ページランク表より r_id のリストをソートする
-  def __pageranking(self,r_id_list):
+  # 但しこのソートはかなり特殊で n で限られたブロックの中しかソートしない
+  def __pagerank_sort(self,r_id_list):
     n = 3
     # ここの n のあたいでtfidfでソートされてるリストをブロックにわけて
     # そのなかでpagerankによりソートする
@@ -208,7 +231,7 @@ class Searcher(DB):
       # ここで n_id をappend してないので n_id は落ちてしまう
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
-    return (self.sort_and(tmp,phrase_dic) , flat_nlist)
+    return (self.sort_toplevel(tmp,phrase_dic) , flat_nlist)
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
