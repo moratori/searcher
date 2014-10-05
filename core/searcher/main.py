@@ -143,7 +143,7 @@ class Searcher(DB):
           # 本当ならフレーズ版の TFIDF　を作りたいけどそれかなり大変だなー
           # データベースの定義からおおきくいろいろ変えないといけなくなりそう ... 
           # 長い語であっても特定的でないヤツはある? -> 情報環境学部とか
-          value = len(phrase) *  self.__count_phrase(r_id , phrase , splited)
+          value = len(phrase) * self.__count_phrase(r_id , phrase , splited)
           if r_id in res:
             res[r_id] += value
           else:
@@ -191,7 +191,7 @@ class Searcher(DB):
       for dic in data: 
         val = dic.get(r_id,None)
         if val:
-          total_score += val
+          total_score += val 
         else:break
       if val:result_dic[r_id] = total_score
     # スコアを元にr_id をソートする
@@ -205,13 +205,10 @@ class Searcher(DB):
     # 各要素は pages[i] はキーワード K_i で検索した時にそれを含むページとそれのtfidf値のリスト
     # 効率化のために __tfidf_sort 部分でtfidfで重みを付けるのと加えて and 処理までしてしまっている　
     # なので 後に続く ソート処理は tfidf_sort が返した結果に大してしかできないね...
-
-
-    # 何もいじらず TFIDF値を求めただけのやつが一番うまく行くのでは....
-    tfidf_sorted  = self.__tfidf_sort(pages)
-    phrase_sorted = self.__phrase_sort(tfidf_sorted , phrase_dic) 
-    result = avg_mergesort(tfidf_sorted , phrase_sorted)
-    return self.__pagerank_sort(result)
+    tfidf_sorted         = self.__tfidf_sort(pages)
+    phrase_sorted        = self.__phrase_sort(tfidf_sorted , phrase_dic) 
+    #pagerank_full_sorted = self.__pagerank_sort(tfidf_sorted , n = len(tfidf_sorted)) 
+    return self.__pagerank_sort(avg_mergesort(tfidf_sorted , phrase_sorted))
 
   def getrank(self,r_id):
     # r_id の PageRankを得る
@@ -220,11 +217,9 @@ class Searcher(DB):
     if not res: return 0
     return res[0][0]
 
-
   # ページランク表より r_id のリストをソートする
   # 但しこのソートはかなり特殊で n で限られたブロックの中しかソートしない
-  def __pagerank_sort(self,r_id_list):
-    n = 3
+  def __pagerank_sort(self,r_id_list,n=3):
     # ここの n のあたいでtfidfでソートされてるリストをブロックにわけて
     # そのなかでpagerankによりソートする
     l = len(r_id_list)
@@ -258,15 +253,25 @@ class Searcher(DB):
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
-  def search_and_toplevel(self,query,digestmaker = None):
+  def search_and_toplevel(self,query,digestmaker = None,pageoff=1,default=12):
+    def part(r_id_list):
+      tmp = pageoff * default
+      # tmp-default の数は user がおかしな番号いれてこなければ
+      # 大丈夫だけどそのへん考慮してないくそ
+      (start , end) = (tmp - default , tmp)
+      start = start if (start > 0) and (len(r_id_list) > start ) else 0
+      return r_id_list[start:end] if (len(r_id_list) >= end) else r_id_list[start:]
     result = []
     # unicode もじの url,title,data を返す
-    sres = self.search_and(query)
-    for r_id in sres[0]:
+    (r_id_list , flat_nlist) = self.search_and(query)
+    for r_id in part(r_id_list):
       tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
       (title,data) = tmp[0]
       (domain,path) = self.db.lookup_url(r_id)
       url = urlparse.urljoin(domain,path)
-      result.append((url,title,(data if not digestmaker else digestmaker(sres[1],data))))
-    return result
+      result.append((url,title,(data if not digestmaker else digestmaker(flat_nlist,data))))
+    return result , len(r_id_list)
+
+
+
 
