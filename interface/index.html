@@ -16,11 +16,15 @@
 
   <body>
     <div id= "header">
-      <h2>dendai.ac.jpドメインのウェブサイトを検索します</h2>
+      <h2>学内検索エンジン</h2>
     </div>
-
     <div id = "main">
       <form action="/cgi-bin/search.py" method = "GET">
+        <input type = "radio" name = "domain" value = "0" checked>全て
+        <input type = "radio" name = "domain" value = "1">電大トップ
+        <input type = "radio" name = "domain" value = "2">SIE
+        <input type = "radio" name = "domain" value = "3">CSE
+        <br><br>
         <input size = "55" type = "text" name = "keyword">
         <input type = "submit" value = "Search">
       </form>

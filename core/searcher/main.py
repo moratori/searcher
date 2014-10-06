@@ -84,7 +84,7 @@ class Searcher(DB):
   def finish(self):
     self.db.close()
 
-  def search_word(self , word):
+  def search_word(self , word, domstr):
     # word は unicode を意図している
     # 登録されていだろう名詞wordについて検索し、
     # その 名詞ID と、 名詞を含むリソースを表すr_idとtfidf値の組み (r_id,tfidf) のリストを返す
@@ -92,9 +92,8 @@ class Searcher(DB):
     tmp = self.db.select("n_id","nmapper","where noun = \"%s\"" %(word))
     if not tmp : return None , []
     ((n_id,),) = tmp
-    return n_id , self.db.select(["r_id" , "tfidf"] , "freq" , "where n_id = %s" %n_id)
-
-
+    self.db.execute("select r_id,tfidf from freq as tmp1 where (n_id = %s) and (exists (select r_id,d_id from rmapper as tmp2 where (tmp2.r_id = tmp1.r_id) and (exists (select * from dmapper where (tmp2.d_id = d_id) and (name like \"%%%s\")))))" %(n_id,domstr))
+    return n_id , self.db.cursor.fetchall() #self.db.select(["r_id" , "tfidf"] , "freq" , "where n_id = %s" %n_id)
 
 
   def __count_phrase(self,r_id,word,splited):
@@ -235,14 +234,14 @@ class Searcher(DB):
     return result
 
 
-  def search_and(self , query):
+  def search_and(self , query , domstr):
     # query は Python unicode で 検索窓に入力された、半角|全角スペースで区切られた文字列
     (phrase_dic , flat_nlist) = self.split(query)
     # とりあえず、 flat_nlist だけみて 検索することにする. phrase検索はその後にする
     # 各単語∈ flat_nlist で検索した結果
     tmp = []
     for noun in flat_nlist:
-      (n_id , rlist) = self.search_word(noun)
+      (n_id , rlist) = self.search_word(noun , domstr)
       # nmapper に存在しないような名詞だったら n_id はNone に成るわけだけど
       # そうなったら 検索結果は存在しない and 検索だから
       if (not n_id) or (not rlist): return ([],[])
@@ -253,7 +252,7 @@ class Searcher(DB):
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
-  def search_and_toplevel(self,query,digestmaker = None,pageoff=1,default=12):
+  def search_and_toplevel(self,query,domstr,digestmaker = None,pageoff=1,default=12):
     def part(r_id_list):
       tmp = pageoff * default
       # tmp-default の数は user がおかしな番号いれてこなければ
@@ -263,7 +262,7 @@ class Searcher(DB):
       return r_id_list[start:end] if (len(r_id_list) >= end) else r_id_list[start:]
     result = []
     # unicode もじの url,title,data を返す
-    (r_id_list , flat_nlist) = self.search_and(query)
+    (r_id_list , flat_nlist) = self.search_and(query,domstr)
     for r_id in part(r_id_list):
       tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
       (title,data) = tmp[0]
