@@ -48,6 +48,11 @@ def escape(text):
   return re.sub(re.compile("[!-/:-@[-`{-~]"),"",text)
 
 
+def count_noun(noun , title , data , param = 1.3):
+  # title も考慮して出現頻度を数える
+  return title.count(noun) * param + data.count(noun)
+
+
 class Indexer:
 
   # scoring の処理は毎回行われるべきであるから 
@@ -60,7 +65,7 @@ class Indexer:
 
   # target となる新しいテキストをもってくる
   def gettarget(self):
-    query = (["r_id","data"] , "data" , "where new = 1")
+    query = (["r_id","title","data"] , "data" , "where new = 1")
     target = apply(self.db.select , query)
     # DBにはutf-8 で入れてるんだけど帰ってくるときにはPython Unicodeになってる
     return target
@@ -74,11 +79,11 @@ class Indexer:
       ((val,),) = tmp
       num = val + 1 if val else 1
       self.db.insert("nmapper" , [num,noun])
-      return num
+      return num , True
     else:
       # すでに noun が存在する場合
       ((num,),) = tmp
-      return num
+      return num , False
 
   def registplace(self,n_id,r_id,indexes):
     self.db.delete("place" , "where (n_id = %s) and (r_id = %s)" %(n_id , r_id))
@@ -107,8 +112,11 @@ class Indexer:
     self.db.close()
 
   def indexing(self):
+    
+    all_noun_list = []
+
     # ここの data　は unicode
-    for (r_id , data) in self.gettarget():
+    for (r_id , title , data) in self.gettarget():
       # noun_list is unicode noun list! 
       (noun_list , cnt) = getnoun(data)
 
@@ -120,25 +128,27 @@ class Indexer:
         continue
 
       # avg(s<-d ,  tf(s,d)) を求める。これが分母となる
-      summing_tf = sum([data.count(noun) for noun in noun_list])/float(len_nlist)
+      summing_tf = reduce(lambda r,x: r + count_noun(x,title,data) , noun_list , 0)/float(len_nlist)
 
       # いままでに得られている 名詞のリストも考える
       # わざわざここで データベースから 名詞一覧を毎回もってこなくても
       # 追加分だけ Python側で 持っとけば必要ないな -> 何万もの名詞のリストをもっとくのは きつくないか?
-      for (num , (n_id,noun)) in enumerate(self.db.select(["n_id","noun"] , "nmapper")):
-        freq = (data.count(noun) / summing_tf)
+      # -> いや毎回 Python に名詞のリストが全部きてんじゃん今でも
+      for (num , (n_id,noun)) in enumerate(all_noun_list): #enumerate(self.db.select(["n_id","noun"] , "nmapper")):
+        freq  = (count_noun(noun , title , data)) / summing_tf
         if freq == 0 : 
           continue
         else:
           self.registfreq(n_id , r_id , freq)
           self.registplace(n_id , r_id , self.getoccurrence(noun,data))
           if ((num % 400) == 0):self.db.commit()
-        self.db.commit()
+      self.db.commit()
 
       # data 自身が含んでいる名詞について考える
       for noun in noun_list:
-        n_id = self.registnoun(noun.encode("utf-8"))
-        freq = (data.count(noun) / summing_tf)
+        (n_id , new) = self.registnoun(noun.encode("utf-8"))
+        if new : all_noun_list.append((n_id,noun))
+        freq  = (count_noun(noun , title , data)) / summing_tf
         if freq == 0 : 
           continue
         else:
@@ -158,7 +168,7 @@ class Indexer:
       idf = math.log(tot_data_num/float(noun_included_num),2)
       now = int(time.time())
       self.db.update("freq",[("tfidf" , tf * idf),("tstamp",now)] , "where (n_id = %s) and (r_id = %s)" %(n_id,r_id))
-      # 300 件毎に commit する. 毎回 commit してたら阿呆みたいに遅くなるので
+      # 400 件毎に commit する. 毎回 commit してたら阿呆みたいに遅くなるので
       if ((num % 400) == 0) : self.db.commit()
     self.db.commit()
 
