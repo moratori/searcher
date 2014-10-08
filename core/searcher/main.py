@@ -205,9 +205,9 @@ class Searcher(DB):
     # 効率化のために __tfidf_sort 部分でtfidfで重みを付けるのと加えて and 処理までしてしまっている　
     # なので 後に続く ソート処理は tfidf_sort が返した結果に大してしかできないね...
     tfidf_sorted         = self.__tfidf_sort(pages)
-    phrase_sorted        = self.__phrase_sort(tfidf_sorted , phrase_dic) 
-    #pagerank_full_sorted = self.__pagerank_sort(tfidf_sorted , n = len(tfidf_sorted)) 
-    return self.__pagerank_sort(avg_mergesort(tfidf_sorted , phrase_sorted))
+    #phrase_sorted        = self.__phrase_sort(tfidf_sorted , phrase_dic) 
+    #pagerank_full_sorted = self.__pagerank_sort(tfidf_sorted , n = len(tfidf_sorted))
+    return tfidf_sorted
 
   def getrank(self,r_id):
     # r_id の PageRankを得る

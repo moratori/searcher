@@ -50,7 +50,8 @@ def escape(text):
 
 def count_noun(noun , title , data , param = 1.3):
   # title も考慮して出現頻度を数える
-  return title.count(noun) * param + data.count(noun)
+  tmp = data.count(noun)
+  return ((len(noun) * param) if (title.count(noun) > 0) else 0) + (0 if tmp == 0 else math.log(tmp+1,5))
 
 
 class Indexer:
@@ -131,15 +132,21 @@ class Indexer:
         self.db.commit()
         continue
 
-      # avg(s<-d ,  tf(s,d)) を求める。これが分母となる
-      summing_tf = reduce(lambda r,x: r + count_noun(x,title,data) , noun_list , 0)/float(len_nlist)
+      avg_tf = 0
+      cnt    = 0
+      for (_ , noun) in all_noun_list:
+        tmp = count_noun(noun , title , data)
+        if tmp > 0:
+          cnt += 1
+          avg_tf += tmp
+      avg_tf /= (1 if cnt == 0 else cnt)
 
       # いままでに得られている 名詞のリストも考える
       # わざわざここで データベースから 名詞一覧を毎回もってこなくても
       # 追加分だけ Python側で 持っとけば必要ないな -> 何万もの名詞のリストをもっとくのは きつくないか?
       # -> いや毎回 Python に名詞のリストが全部きてんじゃん今でも
       for (num , (n_id,noun)) in enumerate(all_noun_list): #enumerate(self.db.select(["n_id","noun"] , "nmapper")):
-        freq  = (count_noun(noun , title , data)) / summing_tf
+        freq  = (count_noun(noun , title , data)) / avg_tf 
         if freq == 0 : 
           continue
         else:
@@ -148,11 +155,14 @@ class Indexer:
           if ((num % 400) == 0):self.db.commit()
       self.db.commit()
 
+      # avg(s<-d ,  tf(s,d)) を求める。これが分母となる
+      avg_tf = reduce(lambda r,x: r + count_noun(x,title,data) , noun_list , 0)/float(len_nlist)
+
       # data 自身が含んでいる名詞について考える
       for noun in noun_list:
         (n_id , new) = self.registnoun(noun.encode("utf-8"))
         if new : all_noun_list.append((n_id,noun))
-        freq  = (count_noun(noun , title , data)) / summing_tf
+        freq  = (count_noun(noun , title , data)) / avg_tf 
         if freq == 0 : 
           continue
         else:
@@ -169,7 +179,7 @@ class Indexer:
     now = int(time.time())
     for (num , (n_id , r_id , tf)) in enumerate(self.db.select(["n_id","r_id","freq"] , "freq" , "where (tfidf is null) or ((%s - tstamp) > %s)" %(now,self.scoring_interval))):
       ((noun_included_num,),) = self.db.select("count(*)" , "freq" , "where n_id = %s" %n_id)
-      idf = math.log(tot_data_num/float(noun_included_num),2)
+      idf = math.log(tot_data_num/float(noun_included_num),10)
       now = int(time.time())
       self.db.update("freq",[("tfidf" , tf * idf),("tstamp",now)] , "where (n_id = %s) and (r_id = %s)" %(n_id,r_id))
       # 400 件毎に commit する. 毎回 commit してたら阿呆みたいに遅くなるので
@@ -238,6 +248,4 @@ def indexing():
   return
 
 
-if __name__ == "__main__" :
-  indexing()
-  
+if __name__ == "__main__" : indexing()
