@@ -113,7 +113,10 @@ class Indexer:
 
   def indexing(self):
     
-    all_noun_list = []
+    # これ 空リストで初期化してたけど
+    # 毎回index作成処理を初めからやることを仮定してしまってるので
+    # ここで初めに nmapper の名詞をとっとこう
+    all_noun_list = list(self.db.select(["n_id","noun"] , "nmapper")) # []
 
     # ここの data　は unicode
     for (r_id , title , data) in self.gettarget():
@@ -214,6 +217,11 @@ class Indexer:
 
 
 def indexing():
+  u"""
+  
+    indexing処理を途中でやめてしまって、再度始めることはできるけど
+    crawlして古いdataが更新された場合は テーブルを初期化してからindexを作ら無ければいけない
+  """
   c = Indexer()
   try:
     # 名詞あつめて nmapper に登録
