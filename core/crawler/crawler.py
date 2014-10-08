@@ -291,6 +291,7 @@ class Crawler:
       # text/html でないなら DBから抹消
       if (not mtype) or (not mtype.startswith("text/html")):
         self.db.erase(r_id)
+        self.db.commit()
         return
       html_raw_data = connection.read()
     except:
@@ -301,6 +302,7 @@ class Crawler:
       (uni_title,uni_text,links) = HTMLAnalizer(url,mtype,html_raw_data).start()
     except:
       self.db.erase(r_id)
+      self.db.commit()
       logging.warning("unparsible contents. erase r_id = %s from DB" %r_id)
       return
     self.save(r_id,d_id,uni_title,uni_text,links)

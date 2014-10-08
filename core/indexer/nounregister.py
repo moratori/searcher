@@ -125,6 +125,7 @@ class Indexer:
       # 名詞がないリソースはいらない
       if (len_nlist == 0) or (cnt == 0):
         self.db.erase(r_id)
+        self.db.commit()
         continue
 
       # avg(s<-d ,  tf(s,d)) を求める。これが分母となる

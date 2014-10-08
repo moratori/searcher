@@ -16,8 +16,9 @@ DATA    = "data"
 LINKR   = "linkr"
 BLACK   = "black"
 WHITE   = "white"
-FREQ = "freq"
-PLACE = "place"
+FREQ    = "freq"
+PLACE    = "place"
+PAGERANK = "pagerank"
 
 
 
@@ -115,6 +116,7 @@ class DB(Sqlutil):
     self.delete(LINKR ,  "where r_id = %s" %r_id)
     self.delete(FREQ  ,  "where r_id = %s" %(r_id))
     self.delete(PLACE ,  "where r_id = %s" %(r_id))
+    self.delete(PAGERANK , "where r_id = %s" %r_id)
     return
 
 
