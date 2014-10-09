@@ -51,10 +51,10 @@ def escape(text):
 # 本文にたくさん出現する noun を log で抑えるんじゃなくて
 # 本文の長さに応じてピークが違う関数を作るべきではない?
 # -> 多く出現することで抑えこむのは IDF の仕事では
-def count_noun(noun , title , data , param = 1.27):
+def count_noun(noun , title , data , param = 1.25):
   # title も考慮して出現頻度を数える
   tmp = data.count(noun)
-  return ((len(noun) * param) if (title.count(noun) > 0) else 0) + (0 if tmp == 0 else math.log(tmp+1,4))
+  return ((len(noun) * param) if (title.count(noun) > 0) else 0) + (0 if tmp == 0 else math.log(tmp+1,4.5))
 
 
 class Indexer:
