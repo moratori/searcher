@@ -204,7 +204,8 @@ class Searcher(DB):
     # 各要素は pages[i] はキーワード K_i で検索した時にそれを含むページとそれのtfidf値のリスト
     # 効率化のために __tfidf_sort 部分でtfidfで重みを付けるのと加えて and 処理までしてしまっている　
     # なので 後に続く ソート処理は tfidf_sort が返した結果に大してしかできないね...
-    tfidf_sorted         = self.__tfidf_sort(pages)
+
+    tfidf_sorted          = self.__tfidf_sort(pages)
     #phrase_sorted        = self.__phrase_sort(tfidf_sorted , phrase_dic) 
     #pagerank_full_sorted = self.__pagerank_sort(tfidf_sorted , n = len(tfidf_sorted))
     return tfidf_sorted
