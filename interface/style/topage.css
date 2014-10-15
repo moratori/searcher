@@ -1,0 +1,32 @@
+#header {
+        padding-top: 5px;
+        margin-top: 125px;
+        margin-left: auto;
+        margin-right: auto;
+        border: solid 1px rgb(0,0,0);
+        background-color: rgb(0,77,160);
+        color: rgb(255,255,255);
+        text-align: center;
+        width: 520;
+}
+#topmain{
+        margin-top: 35px;
+        text-align: center;
+}
+.word{
+        padding: 5px;
+        font-size: 1.1em;
+        font-family: Arial, sans-serif;
+        color: #000;
+        border: solid 1px rgb(150,150,255);
+        width: 540px;
+        height: 30px;
+}
+.button{
+	margin-left: 3px;
+        border: solid 1px #ccc;
+        width: 90px;
+        height: 29px;
+        font-family: Arial , sans-serif;
+        font-size: 1.2em;
+}

@@ -1,33 +1,24 @@
 <html>
   <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>学内検索エンジン</title>
-    <style type = "text/css">
-      #header{
-        margin-top: 40px;
-        text-align: center;
-      }
-      #main{
-        padding-top: 10px;
-        text-align: center;
-      }
-    </style>
+    <meta http-equiv="Conten-Type" content="text/html; charset=utf8">
+    <link rel="stylesheet" href="/style/topage.css" type="text/css">
+    <title>大学内検索エンジン</title>
   </head>
-
   <body>
-    <div id= "header">
-      <h2>学内検索エンジン</h2>
+    <div id = "header">
+      <a href = "http://web.dendai.ac.jp/" target="_blank"><img src="/img/logo.gif"></a>
+      <h2>大学内検索エンジン</h2>
     </div>
-    <div id = "main">
-      <form action="/cgi-bin/search.py" method = "GET">
-        <input type = "radio" name = "domain" value = "0" checked>全て
-        <input type = "radio" name = "domain" value = "1">電大トップ
-        <input type = "radio" name = "domain" value = "2">SIE
-        <input type = "radio" name = "domain" value = "3">CSE
+    <div id = "topmain">
+      <form action="/cgi-bin/search.py" method="GET">
+        <input type="radio" name = "domain" value = "0" checked>全て
+        <input type="radio" name = "domain" value = "1" >電大トップ
+        <input type="radio" name = "domain" value = "2" >SIE
+        <input type="radio" name = "domain" value = "3" >CSE
         <br><br>
-        <input size = "55" type = "text" name = "keyword">
-        <input type = "submit" value = "Search">
+        <input type="text" name="keyword" class="word">
+        <input type="submit" value="検索" class="button">
       </form>
     </div>
-</body>
+  </body>
 </html>
