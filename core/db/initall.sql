@@ -21,3 +21,5 @@ create table freq(n_id int , r_id int , freq float ,tfidf float, tstamp int defa
 create table place (n_id int , r_id int , num int , place int , primary key(n_id , r_id , num));
 
 create table pagerank(r_id int not null primary key , rank float default 0);
+
+create table sword(w1 varchar(8192) not null , w2 varchar(8192) not null , counter int default 1);

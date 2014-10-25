@@ -173,7 +173,7 @@ class Searcher(DB):
         if not noun in tmp_unique:
           tmp_unique.add(noun)
           res_unique.append(noun)
-    return res_dic , res_unique
+    return res_dic , res_unique , words
 
 
   def __tfidf_sort(self,pages):
@@ -235,21 +235,46 @@ class Searcher(DB):
     return result
 
 
+  def regist_query(self,l):
+    if len(l) < 2 : return
+
+    for w1 in l:
+      for w2 in l:
+        if w1 != w2:
+          (a,b) = (w1.encode("utf8") , w2.encode("utf8"))
+          if self.db.select("*" , "sword" , "where w1 = '%s' and w2 = '%s'" %(a,b)):
+            self.db.execute("update sword set counter = counter + 1 where w1 = '%s' and w2 = '%s'" %(a,b))
+          else:
+            self.db.execute("insert into sword(w1,w2) values('%s','%s')" %(a,b))
+        else:pass
+    self.db.commit()
+
+  # 併せてよく検索されるワードを探す
+  def other_words(self,word):
+    return self.db.select(["w1","w2"] , "sword" , "where w1 = '%s' order by counter desc limit 3" %word.encode("utf8"))
+
+
   def search_and(self , query , domstr):
     # query は Python unicode で 検索窓に入力された、半角|全角スペースで区切られた文字列
-    (phrase_dic , flat_nlist) = self.split(query)
+    (phrase_dic , flat_nlist , words) = self.split(query)
     # とりあえず、 flat_nlist だけみて 検索することにする. phrase検索はその後にする
     # 各単語∈ flat_nlist で検索した結果
+    
+    # words は ["情報環境学部" , "スクールバス" , "時間"]
+    # みたいなリスト
+    self.regist_query(sorted(words)[0:3])
+    
+
     tmp = []
     for noun in flat_nlist:
       (n_id , rlist) = self.search_word(noun , domstr)
       # nmapper に存在しないような名詞だったら n_id はNone に成るわけだけど
       # そうなったら 検索結果は存在しない and 検索だから
-      if (not n_id) or (not rlist): return ([],[])
+      if (not n_id) or (not rlist): return ([],[],[])
       # ここで n_id をappend してないので n_id は落ちてしまう
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
-    return (self.sort_toplevel(tmp,phrase_dic) , flat_nlist)
+    return (self.sort_toplevel(tmp,phrase_dic) , flat_nlist , self.other_words(words[0]))
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
@@ -263,14 +288,14 @@ class Searcher(DB):
       return r_id_list[start:end] if (len(r_id_list) >= end) else r_id_list[start:]
     result = []
     # unicode もじの url,title,data を返す
-    (r_id_list , flat_nlist) = self.search_and(query,domstr)
+    (r_id_list , flat_nlist , other_words) = self.search_and(query,domstr)
     for r_id in part(r_id_list):
       tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
       (title,data) = tmp[0]
       (domain,path) = self.db.lookup_url(r_id)
       url = urlparse.urljoin(domain,path)
       result.append((url,title,(data if not digestmaker else digestmaker(flat_nlist,data))))
-    return result , len(r_id_list)
+    return result , len(r_id_list) , other_words
 
 
 

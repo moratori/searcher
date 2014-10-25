@@ -15,8 +15,14 @@
         border-bottom: 4px solid;
         border-bottom-color: rgb(246,246,246);
 }
+#other{
+        margin-top: 5px;
+        text-align: center;
+        font-family: Arial , sans-serif;
+}
+
 #info{
-        margin-top: 15px;
+        margin-top: 13px;
         text-align: center;
         font-family: Arial , sans-serif;
 }

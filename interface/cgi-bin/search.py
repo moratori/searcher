@@ -109,8 +109,18 @@ def search(query,pageoff,domain):
   c = s.Searcher()
   domstr = def_domain[domain] if domain in def_domain else def_domain[0]
   start = time.time()
-  (res , hits) = c.search_and_toplevel(query , domstr , digestmaker = keyword_bold , pageoff=pageoff , default = enumnum)
+  (res , hits , other_words) = c.search_and_toplevel(query , domstr , digestmaker = keyword_bold , pageoff=pageoff , default = enumnum)
+
   interval = time.time() - start
+
+  if other_words:
+    print "<div id = \"other\">"
+    print "他のキーワード: "
+    for each in other_words:
+      (a,b) = (each[0].encode("utf8") , each[1].encode("utf8"))
+      print "<a href =\"/cgi-bin/search.py?keyword=%s %s\">%s %s</a>" %(a , b,a,b)
+    print "</div>"
+
   if hits == 0:
     print "<div id = \"info\">「<b>%s</b>」を含むウェブページは見つかりませんでした</div>" %(query.encode("utf-8"))
   else:
@@ -146,7 +156,7 @@ def main(environ):
     field = cgi.FieldStorage()
     query = field.getvalue("keyword","").decode("utf-8")
     page  = field.getvalue("page" , "").decode("utf-8")
-    domain = field.getvalue("domain" , "1").decode("utf-8")
+    domain = field.getvalue("domain" , "0").decode("utf-8")
     page   = (int(page) if (int(page) > 0) else 1) if page.isdigit() else 1
     domain = int(domain) if domain.isdigit() else 0 
     if query == "" : 
