@@ -56,9 +56,9 @@ class Sqlutil:
         %((",".join(columns) if isinstance(columns,list) else columns),table," ".join(other)))
     return self.__getresult()
 
-  def insert(self,table,values):
+  def insert(self,table,values,column=""):
     values = map(convert,values)
-    self.execute("insert into %s values (%s);" %(table,",".join(values)))
+    self.execute("insert into %s%s values (%s);" %(table,column,",".join(values)))
     return
 
   def update(self,table,setter,*other):

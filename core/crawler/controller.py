@@ -6,13 +6,47 @@ import pickle
 import MySQLdb
 import time
 import urlparse
+import logging
+import datetime
+import traceback
+
+
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/controller.log")
+(user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
+
+
+class Target:
+  def __init__(self,d_id,r_id,url):
+    self.d_id = d_id
+    self.r_id = r_id
+    self.url  = url
+
+
+# Node は Target オブジェクトのコンテナ
+class Node:
+  def __init__(self):
+    self.container = []
+
+  def add(self,target):
+    self.container.append(target)
+
+  def get(self):
+    return self.container.pop()
+
+  def isempty(self):
+    return len(self.container) == 0
+
+
+
 
 
 class TaskController:
 
-  domain_interval = 30
+  domain_interval = 25
   resource_interval = 3600 * 24 * 3
-  work_load = 10
+
+  resource_per_domain = 5
+  work_load = 25
 
   def __init__(self, port , backlog , db_host , db_user , db_passwd , db_name):
     self.lsock= s.socket(s.AF_INET , s.SOCK_STREAM , s.IPPROTO_TCP)
@@ -27,7 +61,9 @@ class TaskController:
       try:
         (new , addr) = self.lsock.accept()
         self.serv(new)
-      except:break
+      except:
+        logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
+        break
     self.stop()
 
   def lookup_dname(self,d_id):
@@ -35,33 +71,12 @@ class TaskController:
     return self.db_cursor.fetchall()[0][0]
 
 
-  """
-
-  ["d_id","name"] ,\
-        DMAPPER ,\
-        "as res" ,\
-        "where ((%s - vtime) > %s)" %(now,self.d_interval) ,\
-        "and ((not exists (select d_id from white limit 1)) or (exists (select d_id from white where res.d_id = white.d_id)))" ,\
-        "and (not exists (select d_id from black where res.d_id = black.d_id))" ,\
-        "order by rand()" ,\
-        "limit %s" %self.max_domain)
-
-
-    ["r_id","path"] , RMAPPER ,\
-          "where" ,\
-          "(d_id = %s) and" %d_id ,\
-          "((%s - vtime) > %s)" %(now,self.r_interval) ,\
-          "order by counter asc" ,\
-          "limit %s" %self.max_access)
-  """
-
   def __getarget_domain(self):
 
     """
      ・ホワイトに書いてあるものだけをもってくる(なにもかいてないなら全てもってくる)
      ・ブラックに書いてあるものをもってこない
      ・時間に満たないものはもってこない
-     (d_id,r_id,URL)のリストを返す
     """
     now = int(time.time())
 
@@ -78,25 +93,70 @@ class TaskController:
       src_domain = filter((lambda x: x[1].endswith(white_domain)) , src_domain)
   
     src_domain   = filter((lambda x: (not x[1].endswith(black_domain)) and (now - int(x[2])) > self.domain_interval) , src_domain)
-    return src_domain
+    return list(src_domain)
 
 
   def getarget(self):
+    """
+     (d_id,r_id,URL)のリストを返す
+    """
 
     now = int(time.time())    
 
+    valid_domain = self.__getarget_domain()
+    while not valid_domain:
+      valid_domain = self.__getarget_domain()
+      time.sleep(int(self.domain_interval/2.0))
 
+    ids = map(lambda x: str(x[0]), valid_domain)
+      
+    self.db_cursor.execute(
+        """
+        select count(*) from rmapper 
+        where ((%s - vtime) > %s) and
+        d_id in (%s)
+        """ 
+        %(now , self.resource_interval , ",".join(ids)))
 
+    ((num,),) = self.db_cursor.fetchall()
+    if (num == 0 ) : return []
 
+    now = int(time.time())
+    
+    result = []
+    for (d_id,name,vtime) in valid_domain:
+      if len(result) >= self.work_load: break 
+      self.db_cursor.execute(
+      """
+      select * from rmapper
+      where 
+      ((%s - vtime) > %s) and
+      (d_id = %s)
+      order by counter asc
+      limit %s
+      """
+      %(now , self.resource_interval , d_id , self.resource_per_domain))
+      tmp = self.db_cursor.fetchall()
+      
+      d_stamp_flag = False
+      node = Node()
+      for (r_id,_,path,vtime,counter) in tmp:
+        node.add(Target(d_id,r_id,urlparse.urljoin(name,path)))
+        if not d_stamp_flag:
+          d_stamp_flag = True
+          self.db_cursor.execute("update dmapper set vtime = %s where d_id = %s" %(now,d_id))
+        self.db_cursor.execute("update rmapper set vtime = %s , counter = counter + 1 where r_id = %s" %(now,r_id))
+      if not node.isempty(): result.append(node)
+      self.db_connecter.commit()
 
-    return 
+    return result
 
 
   def serv(self,csock):
     raw = self.getarget()
     data = pickle.dumps(raw)
     header = "Length:%s\n" %len(data)
-    csock.send(header + data)
+    csock.sendall(header + data)
     csock.close()
 
   def stop(self):
@@ -105,6 +165,9 @@ class TaskController:
     self.db_connecter.close()
 
 
-(user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
-i = TaskController(12345,5,"localhost",user,passwd,"searcher")
-print i.getarget()
+
+
+TaskController(12345,5,"localhost",user,passwd,"searcher").accepter()
+
+
+

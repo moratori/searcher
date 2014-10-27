@@ -12,6 +12,8 @@ import logging
 import getcharset as detect
 import random
 import hashlib
+import socket
+import pickle
 
 from HTMLParser import HTMLParser
 from searcher.core.db.sqlutil import *
@@ -29,7 +31,7 @@ db      = "searcher"
 host    = "localhost"
 
 
-logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler.log")
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
 (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
@@ -184,21 +186,7 @@ class HTMLAnalizer(HTMLParser):
 
 
 class Crawler:
-  
-  # 同一domainにアクセスするのは 180sec ごのinterval
-  # これがでかいと広く浅いcrawlになる
-  d_interval = 170
-
-  # 同一リソースへのアクセスは最低 24 * 7時間間隔
-  r_interval = 3600 * 24 * 7
-
-  # あるドメインのリソースへのアクセスは 20個以内
-  max_access = 20
-
-  # アクセスするドメインは先頭70個を選ぶ
-  max_domain = 70
-
-  # コンテンツにアクセスするときのwait
+    # コンテンツにアクセスするときのwait
   c_interval = 3
 
   # 接続要求出して待つ時間
@@ -207,52 +195,29 @@ class Crawler:
   # User-Agent は IE9
   useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
 
-  def __init__(self,dfilter=None):
+  def __init__(self,server,port):
     self.db = DB(host,user,passwd)
     self.db.open(db)
-    self.domainfilter = dfilter
 
-
-  def __nexttarget_domain(self):
-    now = int(time.time())
-    tmp = self.db.select(\
-        ["d_id","name"] ,\
-        DMAPPER ,\
-        "as res" ,\
-        "where ((%s - vtime) > %s)" %(now,self.d_interval) ,\
-        "and ((not exists (select d_id from white limit 1)) or (exists (select d_id from white where res.d_id = white.d_id)))" ,\
-        "and (not exists (select d_id from black where res.d_id = black.d_id))" ,\
-        "order by rand()" ,\
-        "limit %s" %self.max_domain)
-    return tmp if not self.domainfilter else filter(lambda x:self.domainfilter(x[1]) , tmp)
+    self.server = server
+    self.port  = port
 
 
   def __nexttarget(self):
-    result = []
-    now = int(time.time())
+    s = socket.socket(socket.AF_INET , socket.SOCK_STREAM , socket.IPPROTO_TCP)
+    s.connect((self.server , self.port))
 
-    target= self.__nexttarget_domain()
+    sfile = s.makefile()
 
-    for (d_id , name) in target:
-      cand = self.db.select(\
-          ["r_id","path"] , RMAPPER ,\
-          "where" ,\
-          "(d_id = %s) and" %d_id ,\
-          "((%s - vtime) > %s)" %(now,self.r_interval) ,\
-          "order by counter asc" ,\
-          "limit %s" %self.max_access)
-      tmp = Node()
-      for (r_id,path) in cand:
-        tmp.add(Target(d_id,r_id , urlparse.urljoin(name,path)))
-      if not tmp.isempty() : result.append(tmp)
+    (_,size) = sfile.readline().split(":")
+
+    result = pickle.loads(sfile.read(int(size)))
+
+    sfile.close()
+    s.close()
+
     return result
 
-  def polling(self,wait=30):
-    roots = self.__nexttarget()
-    while not roots:
-      time.sleep(wait)
-      roots = self.__nexttarget()
-    return roots
 
 
   def crawl_toplevel(self):
@@ -274,7 +239,6 @@ class Crawler:
     assert isinstance(node,Node)
     # node は全て同じ ドメインだったはずなので適当にwaitをかける
     for t in node.container:
-      self.stamp(t.d_id,t.r_id)
       self.analyze(t.r_id,t.d_id,t.url)
       # 1URLアクセスするごとに commit することにした
       self.db.commit()
@@ -342,9 +306,7 @@ class Crawler:
       # domain 名でlookup して レコードが存在しないならば新しくinsert する
       dname = getdname(link)
       if not self.db.revlookup_dname(dname):
-        new_id = self.db.next_d_id()
-        d = [new_id , dname , 0]
-        self.db.insert(DMAPPER , d)
+        self.db.insert(DMAPPER , [dname , 0] , "(name,vtime)")
 
     # +++++++ rmapper に登録する ++++++ #
     child_r_ids = []
@@ -358,8 +320,8 @@ class Crawler:
         # ここで 新しいキーをもらえるはずなのに
         # duplicateでprimary key の制約に違反しておちてるケースが
         # ログにあった
-        new_r_id = self.db.next_r_id()
-        self.db.insert(RMAPPER , [new_r_id , d_id , path , 0 , 0])
+        self.db.insert(RMAPPER , [d_id , path , 0 , 0] , "(d_id,path,vtime,counter)")
+        ((new_r_id,),) = self.db.select("r_id" , RMAPPER , "where (d_id = %s) and (path = '%s')" %(d_id,path))
         child_r_ids.append(new_r_id)
       else:
         child_r_ids.append(already[0][0])
@@ -407,12 +369,10 @@ class Crawler:
 
 
 
-def crawl(f):
-  c = Crawler(f)
-  c.d_interval = 12
-  c.c_interval = 5
-  c.crawl_toplevel()
+def crawl():
+  while True:
+    Crawler("localhost",12345).crawl_toplevel()
+    time.sleep(random.randint(1,20))
 
 
-if __name__ == "__main__" :
-  crawl(lambda x:x.endswith(".dendai.ac.jp"))
+if __name__ == "__main__" : crawl()
