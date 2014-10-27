@@ -55,24 +55,41 @@ class TaskController:
           "limit %s" %self.max_access)
   """
 
-  def getarget(self):
+  def __getarget_domain(self):
+
+    """
+     ・ホワイトに書いてあるものだけをもってくる(なにもかいてないなら全てもってくる)
+     ・ブラックに書いてあるものをもってこない
+     ・時間に満たないものはもってこない
+     (d_id,r_id,URL)のリストを返す
+    """
     now = int(time.time())
-    self.db_cursor.execute(
-        """
-        select * from rmapper as tmp where 
-          (tmp.d_id in (select d_id from dmapper where ((%s - vtime) > %s) ))
-          and
-          ((%s - tmp.vtime) > %s)
-          limit %s
-        """ %(now , self.domain_interval , now , self.resource_interval , self.work_load))
 
-    result = []
-    for (r_id , d_id , path , vtime , counter) in self.db_cursor.fetchall():
-      result.append((d_id ,r_id, urlparse.urljoin(self.lookup_dname(d_id) , path)))
-      self.db_cursor.execute("update rmapper set vtime = %s where r_id = %s" %(now , r_id))
-    self.db_connecter.commit()
+    self.db_cursor.execute("select name from white")
+    white_domain = tuple(map(lambda x:x[0],self.db_cursor.fetchall()))
 
-    return result
+    self.db_cursor.execute("select name from black")
+    black_domain = tuple(map(lambda x:x[0],self.db_cursor.fetchall()))
+    
+    self.db_cursor.execute("select * from dmapper order by vtime asc")
+    src_domain = self.db_cursor.fetchall()
+
+    if white_domain:
+      src_domain = filter((lambda x: x[1].endswith(white_domain)) , src_domain)
+  
+    src_domain   = filter((lambda x: (not x[1].endswith(black_domain)) and (now - int(x[2])) > self.domain_interval) , src_domain)
+    return src_domain
+
+
+  def getarget(self):
+
+    now = int(time.time())    
+
+
+
+
+
+    return 
 
 
   def serv(self,csock):
@@ -89,9 +106,5 @@ class TaskController:
 
 
 (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
-
-
-TaskController(
-    12345,5,"localhost",user,passwd,"searcher").accepter()
-
-
+i = TaskController(12345,5,"localhost",user,passwd,"searcher")
+print i.getarget()
