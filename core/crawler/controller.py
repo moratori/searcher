@@ -167,7 +167,8 @@ class TaskController:
 
 
 
-TaskController(12345,5,"localhost",user,passwd,"searcher").accepter()
+if __name__ == "__main__" :
+  TaskController(12345,7,"localhost",user,passwd,"searcher").accepter()
 
 
 
