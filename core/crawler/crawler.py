@@ -20,6 +20,9 @@ from searcher.core.db.sqlutil import *
 
 
 
+random.seed()
+
+
 DMAPPER = "dmapper"
 RMAPPER = "rmapper"
 DATA    = "data"
@@ -27,12 +30,8 @@ LINKR   = "linkr"
 BLACK   = "black"
 WHITE   = "white"
 
-db      = "searcher"
-host    = "localhost"
-
 
 logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
-(user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
 def every(func,seq):
@@ -195,17 +194,18 @@ class Crawler:
   # User-Agent は IE9
   useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
 
-  def __init__(self,server,port):
+  def __init__(self,host,port,user,passwd,db):
+    self.host = host
+    self.port = port
+
     self.db = DB(host,user,passwd)
     self.db.open(db)
 
-    self.server = server
-    self.port  = port
 
 
   def __nexttarget(self):
     s = socket.socket(socket.AF_INET , socket.SOCK_STREAM , socket.IPPROTO_TCP)
-    s.connect((self.server , self.port))
+    s.connect((self.host , self.port))
 
     sfile = s.makefile()
 
@@ -223,11 +223,10 @@ class Crawler:
   def crawl_toplevel(self):
     roots = self.__nexttarget()
     try:
+      print "Working..."
       while roots:
-        ## ここの node らへんをマルチスレッドでアクセスする
-        node = roots.pop()
+        node = roots.pop(0)
         self.crawl(node)
-        roots.extend(self.__nexttarget())
     except:
       logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
     finally:
@@ -294,6 +293,7 @@ class Crawler:
         return [path,base,base + "index.html"]
       else:
         return [path]
+
 
 
     # dmapper と rmapper と linkr テーブルの変更
@@ -370,9 +370,15 @@ class Crawler:
 
 
 def crawl():
+  db      = "searcher"
+  host    = "localhost"
+  (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
+
   while True:
-    Crawler("localhost",12345).crawl_toplevel()
-    time.sleep(random.randint(1,20))
+    print "Connect to Controller..."
+    Crawler("localhost",12345,user,passwd,db).crawl_toplevel()
+    print "Finished working\n"
+    time.sleep(random.randint(1,10))
 
 
 if __name__ == "__main__" : crawl()

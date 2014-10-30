@@ -12,7 +12,6 @@ import traceback
 
 
 logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/controller.log")
-(user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
 
 class Target:
@@ -42,7 +41,7 @@ class Node:
 
 class TaskController:
 
-  domain_interval = 25
+  domain_interval = 40
   resource_interval = 3600 * 24 * 3
 
   resource_per_domain = 5
@@ -59,7 +58,8 @@ class TaskController:
   def accepter(self):
     while True:
       try:
-        (new , addr) = self.lsock.accept()
+        (new , (a,p)) = self.lsock.accept()
+        print "Accepted: %s:%s" %(a,p)
         self.serv(new)
       except:
         logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
@@ -132,21 +132,20 @@ class TaskController:
       where 
       ((%s - vtime) > %s) and
       (d_id = %s)
-      order by counter asc
+      order by rand()
       limit %s
       """
       %(now , self.resource_interval , d_id , self.resource_per_domain))
-      tmp = self.db_cursor.fetchall()
       
-      d_stamp_flag = False
       node = Node()
-      for (r_id,_,path,vtime,counter) in tmp:
-        node.add(Target(d_id,r_id,urlparse.urljoin(name,path)))
-        if not d_stamp_flag:
-          d_stamp_flag = True
-          self.db_cursor.execute("update dmapper set vtime = %s where d_id = %s" %(now,d_id))
+      for (r_id , _ , path , vtime , counter) in self.db_cursor.fetchall():
+        node.add(Target(d_id,r_id,urlparse.urljoin(name,path))) 
         self.db_cursor.execute("update rmapper set vtime = %s , counter = counter + 1 where r_id = %s" %(now,r_id))
-      if not node.isempty(): result.append(node)
+
+      if not node.isempty(): 
+        result.append(node)
+        self.db_cursor.execute("update dmapper set vtime = %s where d_id = %s" %(now,d_id))
+
       self.db_connecter.commit()
 
     return result
@@ -168,6 +167,7 @@ class TaskController:
 
 
 if __name__ == "__main__" :
+  (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
   TaskController(12345,7,"localhost",user,passwd,"searcher").accepter()
 
 
