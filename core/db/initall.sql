@@ -28,4 +28,10 @@ create table place (n_id int , r_id int , num int , place int , primary key(n_id
 
 create table pagerank(r_id int not null primary key , rank float default 0);
 
+/* 今までに検索されたクエリを全て保持するテーブル  */
 create table sword(w1 varchar(8192) not null , w2 varchar(8192) not null , counter int default 1);
+
+/* data から 関連語のテーブルを事前に作る 上のテーブルと本質的に同じ様な用途*/
+create table nounrelation(w1 varchar(8192) not null , w2 varchar(8192) not null , weight int default 0);
+
+
