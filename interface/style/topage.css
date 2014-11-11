@@ -15,18 +15,28 @@
 }
 .word{
         padding: 5px;
-        font-size: 1.1em;
+        font-size: 1.2em;
         font-family: Arial, sans-serif;
         color: #000;
         border: solid 1px rgb(150,150,255);
         width: 540px;
-        height: 30px;
+        /*height: 30px;*/
 }
 .button{
-	margin-left: 3px;
+	margin-left: 4px;
+        margin-top: 1px;
         border: solid 1px #ccc;
         width: 90px;
-        height: 29px;
+        height: 34px;
         font-family: Arial , sans-serif;
-        font-size: 1.2em;
+        font-size: 1.3em;
+}
+#suggest {
+        border: 0px solid rgb(245,245,245);
+        font-size: 1.1em;
+        font-family: Arial,sans-serif;
+        color: rgb(80,80,80);
+        background-color: white;
+        padding: 5px;
+        width: 540px;
 }

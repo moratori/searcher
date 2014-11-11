@@ -19,7 +19,7 @@ FOOTER = "</body></html>"
 
 FORM = """
   <div id = "sform">
-      <form action="/cgi-bin/search.py">
+      <form style = "display: inline; "name = "main" action="/cgi-bin/search.py">
         <input type="radio" name = "domain" value = "0" %s>全て
         <input type="radio" name = "domain" value = "1" %s>電大トップ
         <input type="radio" name = "domain" value = "2" %s>SIE
@@ -28,6 +28,12 @@ FORM = """
         <input type="text" name="keyword" class="word">
         <input type="submit" value="検索" class="button">
       </form>
+      <br>
+      <form style = "display: inline;" name = "suggest">
+        <input name = "relnoun" id = "suggest" type="text" disabled>
+      </form>
+
+      <script>changed();</script>
   </div>
 """
 
@@ -35,6 +41,7 @@ HEADER = '''
 <html>
   <head>
     <meta http-equiv="Conten-Type" content="text/html; charset=utf8">
+    <script type = "text/javascript" src = "/js/suggest.js"></script>
     <link rel="stylesheet" href="/style/sresult.css" type="text/css">
     <title>大学内検索エンジン</title>
   </head>
@@ -124,7 +131,7 @@ def search(query,pageoff,domain):
   if hits == 0:
     print "<div id = \"info\">「<b>%s</b>」を含むウェブページは見つかりませんでした</div>" %(query.encode("utf-8"))
   else:
-    print "<div id = \"info\">「<b>%s</b>」の検索結果 %s ページ目 %s件のヒット( %.4f 秒 )</div>" %(query.encode("utf-8") , pageoff ,hits , interval)
+    print "<div id = \"info\">「<b>%s</b>」の検索結果 <b>%s</b> ページ目 <b>%s</b>件のヒット( <b>%.4f</b> 秒 )</div>" %(query.encode("utf-8") , pageoff ,hits , interval)
 
     print "<div id = \"main\">"
     for (number , (url,title,data)) in enumerate(res):

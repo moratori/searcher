@@ -2,15 +2,18 @@
   <head>
     <meta http-equiv="Conten-Type" content="text/html; charset=utf8">
     <link rel="stylesheet" href="/style/topage.css" type="text/css">
+    <script type = "text/javascript" src = "/js/suggest.js"></script>
     <title>大学内検索エンジン</title>
   </head>
   <body>
+
     <div id = "header">
       <a href = "http://web.dendai.ac.jp/" target="_blank"><img src="/img/logo.gif"></a>
       <h2>大学内検索エンジン</h2>
     </div>
+
     <div id = "topmain">
-      <form action="/cgi-bin/search.py" method="GET">
+      <form name = "main" action="/cgi-bin/search.py" method="GET">
         <input type="radio" name = "domain" value = "0" checked>全て
         <input type="radio" name = "domain" value = "1" >電大トップ
         <input type="radio" name = "domain" value = "2" >SIE
@@ -19,6 +22,17 @@
         <input type="text" name="keyword" class="word">
         <input type="submit" value="検索" class="button">
       </form>
+
+      <form name = "suggest">
+        <input name = "relnoun" id = "suggest" type="text" disabled>
+      </form>
+
     </div>
+
+    <script>
+      changed();
+    </script>
+
+
   </body>
 </html>

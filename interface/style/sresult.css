@@ -10,11 +10,22 @@
 #sform{
         text-align: center;
         background-color: rgb(250,250,250);
-        padding-top: 9px;
+        padding-top: 18px;
         padding-bottom: 3px;
         border-bottom: 4px solid;
         border-bottom-color: rgb(246,246,246);
 }
+#suggest {
+        margin-top: 5px;
+        border: 0px solid rgb(0,0,0);
+        font-size: 0.9em;
+        font-family: Arial,sans-serif;
+        color: rgb(80,80,80);
+        background-color: rgb(250,250,250);
+        padding: 2px;
+        width: 540px;
+}
+
 #other{
         margin-top: 5px;
         text-align: center;
@@ -22,12 +33,12 @@
 }
 
 #info{
-        margin-top: 13px;
+        margin-top: 20px;
         text-align: center;
         font-family: Arial , sans-serif;
 }
 #main{
-        margin-top: 20px;
+        margin-top: 6px;
         border: 1px solid;
         border-color: rgb(246,246,246);
         margin-left: auto;
@@ -54,21 +65,23 @@
 }
 .word{
         padding: 5px;
-        font-size: 1.1em;
+        font-size: 1.2em;
         font-family: Arial, sans-serif;
         color: #000;
         border: solid 1px rgb(150,150,255);
         width: 540px;
-        height: 30px;
 }
 .button{
 	margin-left: 3px;
         border: solid 1px #ccc;
         width: 90px;
-        height: 29px;
+        height: 34px;
         font-family: Arial , sans-serif;
-        font-size: 1.2em;
+        font-size: 1.3em;
 }
+
+
+
 .title{
    font-size: 1.1em;
 }
