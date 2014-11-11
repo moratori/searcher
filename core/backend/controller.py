@@ -9,6 +9,8 @@ import urlparse
 import logging
 import datetime
 import traceback
+import searcher.core.indexer.nounregister as nreg
+import searcher.core.indexer.nounrel as nrel
 
 
 logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/controller.log")
@@ -41,11 +43,29 @@ class Node:
 
 class TaskController:
 
+  """
+    crawlerにアクセスさせたいurlを渡す
+    
+    indexing処理をしたいときはcrawlerがDBに触ることを抑制させるために
+    空のリストを渡す。
+    けど、空のリストを渡すようになってからす直ぐにindexingしていい訳ではなくて
+    現時点でcrawlerが持ってるだろうタスクリストが最低尽きるまで待たないと、DBアクセスするかもしれない。
+
+    ので wait =  ((rpd - 1) * c_interval + timeout * rpd) * work_load 秒待って
+    indexing処理を開始すれば問題無いだろう
+
+    ただ, c_interval と timeout は crawler側で定義される値なので
+    キッチリ実装するならその値をcontrollerと交換して、最長のwaitを待つべき
+  """
+
   domain_interval = 40
   resource_interval = 3600 * 24 * 3
 
   resource_per_domain = 5
-  work_load = 25
+  work_load = 6
+  
+  # ((rpd - 1) * c_interval + timeout * rpd) * work_load であるべき
+  indexing_interval = ((resource_per_domain - 1) * 4 + 6 * resource_per_domain) * work_load
 
   def __init__(self, port , backlog , db_host , db_user , db_passwd , db_name):
     self.lsock= s.socket(s.AF_INET , s.SOCK_STREAM , s.IPPROTO_TCP)
@@ -54,13 +74,37 @@ class TaskController:
 
     self.db_connecter = MySQLdb.connect(host=db_host,user=db_user,passwd=db_passwd,db=db_name)
     self.db_cursor    = self.db_connecter.cursor()
-  
+
+
+  def check_indexing(self):
+    """
+      クロールをやめさせてindexingスべきか判断する
+    """
+
+    self.db_cursor.execute("select count(*) from data where new = 1")
+    ((cnt,),) = self.db_cursor.fetchall()
+
+    self.db_connecter.commit()
+
+    print cnt
+
+    return cnt > 100
+
+
   def accepter(self):
     while True:
       try:
-        (new , (a,p)) = self.lsock.accept()
-        print "Accepted: %s:%s" %(a,p)
-        self.serv(new)
+        if self.check_indexing():
+          print "------ Indexing starting ! ------"
+          print "waitting ..."
+          time.sleep(self.indexing_interval)
+          print "ready to indexing!"
+          nrel.main()
+          nreg.indexing()
+          print "end!!"
+        else:
+          (new , (a,p)) = self.lsock.accept()
+          self.serv(new)
       except:
         logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
         break
@@ -100,6 +144,9 @@ class TaskController:
     """
      (d_id,r_id,URL)のリストを返す
     """
+
+    # [[1,2,3,...,resource_per_domain] , ... , work_load]
+
 
     now = int(time.time())    
 
@@ -152,6 +199,11 @@ class TaskController:
 
 
   def serv(self,csock):
+    """
+      crawlerにアクセスさせたいurlを返す
+      crawlerは必ずここに仕事をもらいにくるので
+      ターゲットが無ければ適当な時間を置いてポーリングしてくる
+    """
     raw = self.getarget()
     data = pickle.dumps(raw)
     header = "Length:%s\n" %len(data)
@@ -168,7 +220,7 @@ class TaskController:
 
 if __name__ == "__main__" :
   (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
-  TaskController(12345,7,"localhost",user,passwd,"searcher").accepter()
+  TaskController(12345,8,"localhost",user,passwd,"searcher").accepter()
 
 
 

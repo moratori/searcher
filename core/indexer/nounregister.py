@@ -232,10 +232,26 @@ class Indexer:
 def indexing():
   u"""
   
-    indexing処理を途中でやめてしまって、再度始めることはできるけど
     crawlして古いdataが更新された場合は テーブルを初期化してからindexを作ら無ければいけない
+
+    逆にまだ古くなっていない場合は差分だけ(新しくnewフラグがたったものだけ)indexingしてやればいいんだけど
+    現状の実装だと毎回インデックスを全て作成しなおしている.(全データをnewにしている)
+
   """
   c = Indexer()
+
+  c.db.execute("drop table if exists freq;")
+  c.db.execute("drop table if exists place;")
+  c.db.execute("drop table if exists pagerank;")
+
+  c.db.execute("update data set new = 1;")
+  
+  c.db.execute("create table freq(n_id int , r_id int , freq float ,tfidf float, tstamp int default 0 ,primary key(n_id , r_id));")
+  c.db.execute("create table place (n_id int , r_id int , num int , place int , primary key(n_id , r_id , num));")
+  c.db.execute("create table pagerank(r_id int not null primary key , rank float default 0);")
+
+  c.db.commit()
+
   try:
     # 名詞あつめて nmapper に登録
     # place テーブルにも出現位置とかいれる
@@ -252,3 +268,4 @@ def indexing():
 
 
 if __name__ == "__main__" : indexing()
+

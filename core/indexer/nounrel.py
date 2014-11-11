@@ -81,6 +81,11 @@ def main():
 
   c = MySQLdb.connect(host="localhost" , user=user,passwd=passwd ,db="searcher",charset="utf8")
   cur = c.cursor()
+
+  cur.execute("drop table if exists nounrelation;")
+  cur.execute("create table nounrelation(w1 varchar(8192) not null , w2 varchar(8192) not null , weight int default 0);")
+  c.commit()
+
   cur.execute("select data from data");
   resultnet = {}
 

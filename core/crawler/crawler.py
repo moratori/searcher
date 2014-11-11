@@ -31,7 +31,9 @@ BLACK   = "black"
 WHITE   = "white"
 
 
-logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
+#logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
+logging.basicConfig(filename="/home/moratori/Desktop/log2.log")
+
 
 
 def every(func,seq):
@@ -186,7 +188,7 @@ class HTMLAnalizer(HTMLParser):
 
 class Crawler:
     # コンテンツにアクセスするときのwait
-  c_interval = 3
+  c_interval = 4
 
   # 接続要求出して待つ時間
   timeout = 6
@@ -221,14 +223,18 @@ class Crawler:
 
 
   def crawl_toplevel(self):
-    roots = self.__nexttarget()
+    try:
+      roots = self.__nexttarget()
+    except:
+      logging.warning("\nconnect failed: " + str(datetime.datetime.today()) + "\nto controller, retry later ...\n")
+      return
     try:
       print "Working..."
       while roots:
         node = roots.pop(0)
         self.crawl(node)
     except:
-      logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
+      logging.error("\nunexpected error: " + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
     finally:
       self.finish()
     return 
@@ -370,13 +376,14 @@ class Crawler:
 
 
 def crawl():
-  db      = "searcher"
-  host    = "localhost"
+  db         = "searcher"
+  controller = "localhost"
+  port       = 12345 
   (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
   while True:
     print "Connect to Controller..."
-    Crawler("localhost",12345,user,passwd,db).crawl_toplevel()
+    Crawler(controller , port , user , passwd , db).crawl_toplevel()
     print "Finished working\n"
     time.sleep(random.randint(1,10))
 
