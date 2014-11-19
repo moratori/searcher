@@ -58,7 +58,7 @@ class TaskController:
     キッチリ実装するならその値をcontrollerと交換して、最長のwaitを待つべき
   """
 
-  domain_interval = 40
+  domain_interval = 45
   resource_interval = 3600 * 24 * 3
 
   resource_per_domain = 5
@@ -88,7 +88,7 @@ class TaskController:
 
     print cnt
 
-    return (cnt > 100) and (datetime.datetime.today().hour == 3)
+    return (cnt > 5000) and (datetime.datetime.today().hour == 2)
 
 
   def accepter(self):
