@@ -88,12 +88,12 @@ class TaskController:
 
     print cnt
 
-    return cnt > 100
+    return (cnt > 100) and (datetime.datetime.today().hour == 3)
 
 
   def accepter(self):
     while True:
-      try:
+      try: 
         if self.check_indexing():
           print "------ Indexing starting ! ------"
           print "waitting ..."

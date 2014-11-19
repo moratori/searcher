@@ -32,7 +32,7 @@ WHITE   = "white"
 
 
 #logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
-logging.basicConfig(filename="/home/moratori/Desktop/log2.log")
+logging.basicConfig(filename="/home/moratori/Desktop/log3.log")
 
 
 
