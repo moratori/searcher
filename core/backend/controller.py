@@ -86,22 +86,22 @@ class TaskController:
 
     self.db_connecter.commit()
 
-    print cnt
+    print "new contents: %s" %cnt
 
-    return (cnt > 5000) and (datetime.datetime.today().hour == 2)
+    return (cnt > 3000) and (datetime.datetime.today().hour == 1)
 
 
   def accepter(self):
     while True:
       try: 
         if self.check_indexing():
-          print "------ Indexing starting ! ------"
+          print "\n------ Indexing starting ! ------"
           print "waitting ..."
           time.sleep(self.indexing_interval)
           print "ready to indexing!"
           nrel.main()
           nreg.indexing()
-          print "end!!"
+          print "------ Indexing finished ! ------"
         else:
           (new , (a,p)) = self.lsock.accept()
           self.serv(new)
