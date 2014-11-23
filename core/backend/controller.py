@@ -59,7 +59,7 @@ class TaskController:
   """
 
   domain_interval = 45
-  resource_interval = 3600 * 24 * 3
+  resource_interval = 3600 * 24 * 6
 
   resource_per_domain = 5
   work_load = 6
@@ -86,25 +86,31 @@ class TaskController:
 
     self.db_connecter.commit()
 
-    print "new contents: %s" %cnt
+    day = datetime.datetime.today()
 
-    return (cnt > 3000) and (datetime.datetime.today().hour == 1)
+    a = (cnt > 5000)
+    b = day.hour == 23
+    c = day.weekday() == 4
+
+    return (a, a and b and c)
 
 
   def accepter(self):
     while True:
       try: 
-        if self.check_indexing():
-          print "\n------ Indexing starting ! ------"
-          print "waitting ..."
+        (stop_crawl , make_index) = self.check_indexing()
+        if make_index:
+          logging.warning("\nIndexing start at %s" %str(datetime.datetime.today()))
           time.sleep(self.indexing_interval)
-          print "ready to indexing!"
           nrel.main()
+          # 以下の処理 nreg.indexing()は indexing , scoring , pageranking の３つに別れるんだけど
+          # indexing の部分で SEGV くらって落とされると、 exceptにも引っかからず残りのscoringもpagerankingも行われず
+          # 死ぬ
           nreg.indexing()
-          print "------ Indexing finished ! ------"
+          self.stop(flag=True)
         else:
           (new , (a,p)) = self.lsock.accept()
-          self.serv(new)
+          self.serv(new,stop_crawl)
       except:
         logging.error("\n" + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
         break
@@ -198,22 +204,29 @@ class TaskController:
     return result
 
 
-  def serv(self,csock):
+  def serv(self,csock,stop_crawl):
     """
       crawlerにアクセスさせたいurlを返す
       crawlerは必ずここに仕事をもらいにくるので
       ターゲットが無ければ適当な時間を置いてポーリングしてくる
     """
-    raw = self.getarget()
-    data = pickle.dumps(raw)
+    if stop_crawl:
+      data = ""
+    else:
+      data = pickle.dumps(self.getarget())
     header = "Length:%s\n" %len(data)
     csock.sendall(header + data)
     csock.close()
 
-  def stop(self):
+  def stop(self,flag=False):
     self.lsock.close()
     self.db_cursor.close()
     self.db_connecter.close()
+    if flag:
+      logging.warninig("\nwill now halt!!! waitting crawlers...")
+      time.sleep(self.indexing_interval)
+      logging.warninig("\nrebooting!!!")
+      os.system("shutdown -r now")
 
 
 

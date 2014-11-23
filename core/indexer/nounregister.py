@@ -229,7 +229,7 @@ class Indexer:
     self.db.commit()
 
 
-def indexing():
+def indexing(clear=True):
   u"""
   
     crawlして古いdataが更新された場合は テーブルを初期化してからindexを作ら無ければいけない
@@ -240,22 +240,23 @@ def indexing():
   """
   c = Indexer()
 
-  c.db.execute("drop table if exists freq;")
-  c.db.execute("drop table if exists place;")
-  c.db.execute("drop table if exists pagerank;")
-
-  c.db.execute("update data set new = 1;")
-  
-  c.db.execute("create table freq(n_id int , r_id int , freq float ,tfidf float, tstamp int default 0 ,primary key(n_id , r_id));")
-  c.db.execute("create table place (n_id int , r_id int , num int , place int , primary key(n_id , r_id , num));")
-  c.db.execute("create table pagerank(r_id int not null primary key , rank float default 0);")
-
-  c.db.commit()
+  if clear:
+    c.db.execute("drop table if exists freq;")
+    c.db.execute("drop table if exists place;")
+    c.db.execute("drop table if exists pagerank;")
+    
+    c.db.execute("update data set new = 1;")
+    
+    c.db.execute("create table freq(n_id int , r_id int , freq float ,tfidf float, tstamp int default 0 ,primary key(n_id , r_id));")
+    c.db.execute("create table place (n_id int , r_id int , num int , place int , primary key(n_id , r_id , num));")
+    c.db.execute("create table pagerank(r_id int not null primary key , rank float default 0);")
+    
+    c.db.commit()
 
   try:
     # 名詞あつめて nmapper に登録
     # place テーブルにも出現位置とかいれる
-    c.indexing()
+    #c.indexing()
     # 各名詞とウェブページに対するTFIDFを計算する
     c.scoring()
     # PageRankを計算する 
@@ -267,5 +268,5 @@ def indexing():
   return
 
 
-if __name__ == "__main__" : indexing()
+if __name__ == "__main__" : indexing(clear=False)
 

@@ -4,7 +4,9 @@ function last(s){
   for (i =  s.length - 1; i >= 0; i--){
     var c = s.charAt(i);
     if ((c == " ") || (c == "　")){
+      if (result != ""){
         break;
+      }
     }else{
       result = c + result;
     }
@@ -26,12 +28,13 @@ function showrel(s){
 function changed() {
   var init = "";
   setTimeout(function () {
-    tmp = last(document.main.keyword.value);
+    raw = document.main.keyword.value
+    tmp = last(raw);
     if (tmp == "") {
       document.suggest.relnoun.value = "" 
-    }else if (tmp != init){
+    }else if (raw != init){
       showrel(tmp);
-      init = tmp;
+      init = raw;
     }
     setTimeout(arguments.callee , 350)
   },350);
