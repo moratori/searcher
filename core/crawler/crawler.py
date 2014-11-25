@@ -14,6 +14,7 @@ import random
 import hashlib
 import socket
 import pickle
+import os
 
 from HTMLParser import HTMLParser
 from searcher.core.db.sqlutil import *
@@ -32,7 +33,7 @@ WHITE   = "white"
 
 
 #logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
-logging.basicConfig(filename="/home/moratori/Desktop/log3.log")
+logging.basicConfig(filename="/home/moratori/Desktop/log5.log")
 
 
 
@@ -114,7 +115,7 @@ class HTMLAnalizer(HTMLParser):
   exclude_extension = \
      set(["jpg","jpeg","png","gif","ico","bmp",\
        "wmv","wma","wma","wav","mp4","mp3","mid","midi","mov","mpg","mpeg","avi","swf" ,\
-       "xls","xlsx","doc","docx","ppt","pptx","pdf",\
+       "xls","xlsx","doc","docx","ppt","pptx",\
        "zip","rar","lzh","gz","z","cab",\
        "css","js","xml","txt","exe","csv"]) 
 
@@ -191,10 +192,12 @@ class Crawler:
   c_interval = 4
 
   # 接続要求出して待つ時間
-  timeout = 6
+  timeout = 15
   
   # User-Agent は IE9
   useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
+
+  mime_type = ("text/html","application/pdf")
 
   def __init__(self,host,port,user,passwd,db):
     self.host = host
@@ -229,7 +232,6 @@ class Crawler:
       logging.warning("\nconnect failed: " + str(datetime.datetime.today()) + "\nto controller, retry later ...\n")
       return
     try:
-      print "Working..."
       while roots:
         node = roots.pop(0)
         self.crawl(node)
@@ -249,6 +251,28 @@ class Crawler:
       self.db.commit()
       time.sleep(random.randint(1,self.c_interval))
 
+  def gethtml(self,connection,mtype):
+    data = connection.read()
+    if mtype.startswith("text/html"):
+      return data
+    elif mtype.startswith("application/pdf"):
+      result = ""
+      tmpfile = str(datetime.datetime.today()).replace(" ","-").replace(":","-").replace(".","-")
+      resfile = tmpfile + "result"
+      with open(tmpfile , "w") as f:
+        f.write(data)
+      os.system("pdf2txt.py -o %s -t html %s" %(resfile , tmpfile))
+      with open(resfile , "r") as f:
+        result = f.read()
+      os.remove(tmpfile)
+      os.remove(resfile)
+      return result
+    else:
+      # gethtmlメソッドが呼ばれる前に mtype が self.mime_typeで始まる事を意図しているので
+      # のでここにはこない
+      assert False
+
+
   # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
   def analyze(self,r_id,d_id,url):
     print "Acessing: %s" %url
@@ -258,13 +282,13 @@ class Crawler:
       mtype = connection.info().getheader("Content-Type")
       # content-type が明示されていない若しくは
       # text/html でないなら DBから抹消
-      if (not mtype) or (not mtype.startswith("text/html")):
+      if (not mtype) or (not mtype.startswith(self.mime_type)):
         self.db.erase(r_id)
         self.db.commit()
         return
-      html_raw_data = connection.read()
+      html_raw_data = self.gethtml(connection,mtype)
     except:
-      logging.warning("can't connect url: %s" %url)
+      logging.warning(("can't connect url: %s" %url) + "\n" +  str(traceback.format_exc()))
       return
    
     try:
@@ -382,10 +406,8 @@ def crawl():
   (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
 
   while True:
-    print "Connect to Controller..."
     Crawler(controller , port , user , passwd , db).crawl_toplevel()
-    print "Finished working\n"
-    time.sleep(random.randint(1,10))
+    time.sleep(random.randint(1,12))
 
 
 if __name__ == "__main__" : crawl()

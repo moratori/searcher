@@ -65,7 +65,7 @@ class TaskController:
   work_load = 6
   
   # ((rpd - 1) * c_interval + timeout * rpd) * work_load であるべき
-  indexing_interval = ((resource_per_domain - 1) * 4 + 6 * resource_per_domain) * work_load
+  indexing_interval = ((resource_per_domain - 1) * 4 + 15 * resource_per_domain) * work_load
 
   def __init__(self, port , backlog , db_host , db_user , db_passwd , db_name):
     self.lsock= s.socket(s.AF_INET , s.SOCK_STREAM , s.IPPROTO_TCP)
