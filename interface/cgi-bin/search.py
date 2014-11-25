@@ -139,7 +139,7 @@ def search(query,pageoff,domain):
       title = fixlen(title, 50 , dot = True).encode("utf-8")
       data = data.encode("utf-8")
       print "<div class=\"each\">"
-      print "<div class=\"title\"><a href = \"%s\" target = \"_blank\">%s</a></div>" %(url , "UNTITLED" if (title == "") else title)
+      print "<div class=\"title\"><a href = \"%s\" target = \"_blank\">%s</a></div>" %(url , "&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title)
       print "<div class=\"url\">%s</div>" %(fixlen(url , 60 , dot = True) )
       print "<div class=\"abst\">%s</div>" %(data)
       print "</div>"
