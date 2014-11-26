@@ -58,7 +58,8 @@ class TaskController:
     キッチリ実装するならその値をcontrollerと交換して、最長のwaitを待つべき
   """
 
-  domain_interval = 45
+  #domain_interval = 40
+  domain_interval = 40
   resource_interval = 3600 * 24 * 6
 
   resource_per_domain = 5
@@ -214,6 +215,7 @@ class TaskController:
       data = ""
     else:
       data = pickle.dumps(self.getarget())
+
     header = "Length:%s\n" %len(data)
     csock.sendall(header + data)
     csock.close()

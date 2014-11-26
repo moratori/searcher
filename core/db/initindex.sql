@@ -3,6 +3,7 @@ use searcher;
 drop table if exists freq;
 drop table if exists place;
 drop table if exists pagerank;
+drop table if exists nounrelation;
 
 
 update data set new = 1;
@@ -13,3 +14,5 @@ create table freq(n_id int , r_id int , freq float ,tfidf float, tstamp int defa
 create table place (n_id int , r_id int , num int , place int , primary key(n_id , r_id , num));
 
 create table pagerank(r_id int not null primary key , rank float default 0);
+create table nounrelation(w1 varchar(8192) not null , w2 varchar(8192) not null , weight int default 0);
+

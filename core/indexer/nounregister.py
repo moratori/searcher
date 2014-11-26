@@ -118,6 +118,31 @@ class Indexer:
   def finish(self):
     self.db.close()
 
+  def estimate_title(self,r_id,noun_list):
+    """
+      タイトルの無いコンテンツのために、本文からタイトルを推定する
+    """
+    return u""
+
+    counter = {}
+    for each in noun_list:
+      if each in counter:
+        counter[each] += 1
+      else:
+        counter[each] = 1
+    k = counter.keys()
+    cand = sorted(k,key=lambda x:-counter[x])
+    title = u""
+    for each in cand:
+      if not self.stop_word(each):
+        title = each
+        break
+    title = cand[0] if not title else title
+    self.db.execute("update data set title = \"%s\" where r_id = %s" %(title,r_id))
+    self.db.commit()
+
+    return title
+
   def indexing(self):
     
     # これ 空リストで初期化してたけど
@@ -137,6 +162,13 @@ class Indexer:
         self.db.erase(r_id)
         self.db.commit()
         continue
+      
+      
+      # r_id がタイトルｎ無いコンテンツだった場合のために
+      # 推定を行なう
+      if not title: 
+        title = self.estimate_title(r_id,noun_list)
+
 
       avg_tf = 0
       cnt    = 0

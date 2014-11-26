@@ -14,9 +14,37 @@ class ENDParse(Exception):
     return repr(self.result)
 
 
+
+
+class XMLGetCharset(HTMLParser):
+  """
+    start メソッドにxml文書をぶち込むとcharsetを返す
+  """
+
+  default = "utf-8"
+  
+  def __init__(self):
+    HTMLParser.__init__(self)
+
+
+  def handle_pi(self,data):
+    t = filter(lambda x:x.startswith("encoding"),data.split(" "))
+    if t:
+      raise ENDParse(t[0].split("=")[1].strip("\"").lower())
+
+  def start(self,target):
+    try:
+      self.feed(target)
+    except ENDParse as e:
+      return e.result
+    except:pass
+    return self.default
+ 
+
+
 # head の meta タグ周辺にまでマルチバイト文字があったら
 # どうなるかは保証しない
-class GetCharset(HTMLParser):
+class HTMLGetCharset(HTMLParser):
 
   default_charset = "shift_jis"
 
@@ -28,7 +56,7 @@ class GetCharset(HTMLParser):
     if (stag == "meta"):
       tmp = dict([(each[0].lower() , each[1].lower()) for each in attrs]) 
       if ("http-equiv" in tmp) and (tmp["http-equiv"] == "content-type") and ("content" in tmp):
-        result = GetCharset.getcharset(tmp["content"])
+        result = HTMLGetCharset.getcharset(tmp["content"])
         if result: raise ENDParse(result)
 
   # http-header の mime 形式から charset を得る

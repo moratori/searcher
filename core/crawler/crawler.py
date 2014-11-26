@@ -15,6 +15,7 @@ import hashlib
 import socket
 import pickle
 import os
+import zipfile
 
 from HTMLParser import HTMLParser
 from searcher.core.db.sqlutil import *
@@ -57,12 +58,12 @@ def remove_unnecessary(l):
   return result
 
 def getdname(link):
-  return (link.scheme + "://" + link.netloc).encode("utf-8")
+  return (link.scheme + "://" + link.netloc).encode("utf-8",errors="ignore")
 
 def getpath(link):
   path = link.path
   query = link.query
-  result = ((path if query == "" else path + "?" + query).encode("utf-8"))
+  result = ((path if query == "" else path + "?" + query).encode("utf-8",errors="ignore"))
   return "/" if result == "" else result
 
 def qescape(text):
@@ -71,6 +72,37 @@ def qescape(text):
 def escape(text):
   # utf-8 な文字列しかできない
   return re.sub(re.compile("[!-/:-@[-`{-~]"),"",text)
+
+
+def decode_to_unicode(text,est):
+  default = [est,"shift_jis","utf-8"]
+  for codec in default:
+    try:
+      tmp = text.decode(codec)
+      return tmp
+    except:pass
+  return text.decode(est,errors="ignore")
+
+
+ 
+
+
+def analizepptx(path,proc):
+  """
+    path(pptxファイル)の一枚ずつの slide[0-9].xml の文字列
+    をprocに与えて呼び出す
+
+    procは自分で xmlファイルのエンコーディングを調べて適切に処理する1引数関数
+  """
+  result = u""
+  with zipfile.ZipFile(path,"r") as zf:
+    target = zf.namelist()
+    for each in target:
+      if re.match("ppt/slides/slide([0-9])+\.xml",each):
+        with zf.open(each,"r") as xmlfile:
+          result += proc(xmlfile.read()) + u" "
+  return result
+
 
 
 class Target:
@@ -115,7 +147,7 @@ class HTMLAnalizer(HTMLParser):
   exclude_extension = \
      set(["jpg","jpeg","png","gif","ico","bmp",\
        "wmv","wma","wma","wav","mp4","mp3","mid","midi","mov","mpg","mpeg","avi","swf" ,\
-       "xls","xlsx","doc","docx","ppt","pptx",\
+       "xls","xlsx","doc","docx","ppt",\
        "zip","rar","lzh","gz","z","cab",\
        "css","js","xml","txt","exe","csv"]) 
 
@@ -125,11 +157,11 @@ class HTMLAnalizer(HTMLParser):
   def __init__(self,url,mtype,rawhtmldata):
     HTMLParser.__init__(self)
 
-    self.charset       = detect.GetCharset.getcharset(mtype)
-    # GetCharsetクラスが頑張ってmetaタグの中みて charset を得るけど、絶対合ってるとはいえないけど
+    self.charset       = detect.HTMLGetCharset.getcharset(mtype)
+    # HTMLGetCharsetクラスが頑張ってmetaタグの中みて charset を得るけど、絶対合ってるとはいえないけど
     # その場合はどうしようか
-    self.charset       = detect.GetCharset(rawhtmldata).start() if not self.charset else self.charset
-    self.rawhtml       = rawhtmldata.decode(self.charset)
+    self.charset       = detect.HTMLGetCharset(rawhtmldata).start() if not self.charset else self.charset
+    self.rawhtml       = decode_to_unicode(rawhtmldata,self.charset) 
     self.url           = url
 
     self.innertag_list = []
@@ -186,6 +218,30 @@ class HTMLAnalizer(HTMLParser):
 
 
 
+class XMLAnalizer(HTMLParser):
+
+  """
+    handle_data に与えられたデータをくっつけて返す
+    但しゴミはのぞく 半角記号,半角数字,1文字のなにかがゴミ
+  """
+
+  def __init__(self,raw):
+    HTMLParser.__init__(self)
+    self.raw    = decode_to_unicode(raw,detect.XMLGetCharset().start(raw))
+    self.result = u""
+
+  def handle_data(self,data):
+    tmp = re.sub(re.compile("[!-@[-`{-~]"),"",data.strip())
+    if tmp != u"" and len(tmp) != 1:
+      self.result += tmp + u" "
+
+  def start(self):
+    self.feed(self.raw)
+    return self.result
+
+
+
+
 
 class Crawler:
     # コンテンツにアクセスするときのwait
@@ -197,7 +253,7 @@ class Crawler:
   # User-Agent は IE9
   useragent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)"
 
-  mime_type = ("text/html","application/pdf")
+  mime_type = ("text/html","application/pdf","application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
   def __init__(self,host,port,user,passwd,db):
     self.host = host
@@ -231,14 +287,12 @@ class Crawler:
     except:
       logging.warning("\nconnect failed: " + str(datetime.datetime.today()) + "\nto controller, retry later ...\n")
       return
-    try:
-      while roots:
-        node = roots.pop(0)
-        self.crawl(node)
-    except:
-      logging.error("\nunexpected error: " + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
-    finally:
-      self.finish()
+
+    while roots:
+      node = roots.pop(0)
+      self.crawl(node)
+
+    self.finish()
     return 
  
 
@@ -246,38 +300,52 @@ class Crawler:
     assert isinstance(node,Node)
     # node は全て同じ ドメインだったはずなので適当にwaitをかける
     for t in node.container:
-      self.analyze(t.r_id,t.d_id,t.url)
-      # 1URLアクセスするごとに commit することにした
-      self.db.commit()
+      try:
+        self.analyze(t.r_id,t.d_id,t.url)
+        # 1URLアクセスするごとに commit することにした
+        self.db.commit()
+      except:
+        logging.error("\nunexpected error: " + str(datetime.datetime.today()) + "\n" + traceback.format_exc() + "\n")
       time.sleep(random.randint(1,self.c_interval))
 
-  def gethtml(self,connection,mtype):
+
+  def getcontent(self,url,connection,mtype):
     data = connection.read()
-    if mtype.startswith("text/html"):
-      return data
+    if   mtype.startswith("text/html"):
+      return HTMLAnalizer(url,mtype,data).start()
     elif mtype.startswith("application/pdf"):
-      result = ""
+      result = u""
       tmpfile = str(datetime.datetime.today()).replace(" ","-").replace(":","-").replace(".","-")
       resfile = tmpfile + "result"
       with open(tmpfile , "w") as f:
         f.write(data)
-      os.system("pdf2txt.py -o %s -t html %s" %(resfile , tmpfile))
+      os.system("pdf2txt.py -c utf8 -o %s %s" %(resfile , tmpfile))
       with open(resfile , "r") as f:
-        result = f.read()
+        for line in f.read().decode("utf-8").split("\n"):
+          tmp = line.strip()
+          if tmp : result += tmp + u" "
       os.remove(tmpfile)
       os.remove(resfile)
-      return result
+      return (u"",result,[])
+    elif mtype.startswith("application/vnd.openxmlformats-officedocument.presentationml.presentation"):
+      tmpfile = str(datetime.datetime.today()).replace(" ","-").replace(":","-").replace(".","-")
+      with open(tmpfile , "w") as f:
+        f.write(data)
+      result = analizepptx(tmpfile , lambda raw: XMLAnalizer(raw).start())
+      os.remove(tmpfile)
+      return (u"",result,[])
     else:
-      # gethtmlメソッドが呼ばれる前に mtype が self.mime_typeで始まる事を意図しているので
+      # getcontentメソッドが呼ばれる前に mtype が self.mime_typeで始まる事を意図しているので
       # のでここにはこない
       assert False
+
 
 
   # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
   def analyze(self,r_id,d_id,url):
     print "Acessing: %s" %url
     try:
-      req = urllib2.Request(url,"",{"User-Agent": self.useragent})
+      req = urllib2.Request(url,headers={"User-Agent": self.useragent})
       connection = urllib2.urlopen(req,timeout=self.timeout)
       mtype = connection.info().getheader("Content-Type")
       # content-type が明示されていない若しくは
@@ -286,17 +354,15 @@ class Crawler:
         self.db.erase(r_id)
         self.db.commit()
         return
-      html_raw_data = self.gethtml(connection,mtype)
     except:
       logging.warning(("can't connect url: %s" %url) + "\n" +  str(traceback.format_exc()))
       return
-   
     try:
-      (uni_title,uni_text,links) = HTMLAnalizer(url,mtype,html_raw_data).start()
+      (uni_title,uni_text,links) = self.getcontent(url,connection,mtype)
     except:
       self.db.erase(r_id)
       self.db.commit()
-      logging.warning("unparsible contents. erase r_id = %s from DB" %r_id)
+      logging.warning(("unparsible contents. erase r_id = %s from DB" %r_id) + "\n" + traceback.format_exc() + "\n\n")
       return
     self.save(r_id,d_id,uni_title,uni_text,links)
 
@@ -367,8 +433,8 @@ class Crawler:
 
 
     diff_length = 10;
-    store_title = escape(uni_title.encode("utf-8"))
-    store_data  = escape(uni_text.encode("utf-8"))
+    store_title = escape(uni_title.encode("utf-8",errors="ignore"))
+    store_data  = escape(uni_text.encode("utf-8",errors="ignore"))
     store_len   = len(uni_text)
     store_hash  = gethash(store_data)
 

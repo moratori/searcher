@@ -22,6 +22,14 @@ insert into rmapper(r_id,d_id) values(3,3);
 insert into white values("dendai.ac.jp");
 
 
+/*
+insert into dmapper values(1,"http://localhost",0);
+insert into rmapper(r_id,d_id) values(1,1);
+insert into white values("localhost");
+*/
+
+
+
 create table nmapper(n_id int not null primary key auto_increment , noun text);
 create table freq(n_id int , r_id int , freq float ,tfidf float, tstamp int default 0 ,primary key(n_id , r_id));
 create table place (n_id int , r_id int , num int , place int , primary key(n_id , r_id , num));
