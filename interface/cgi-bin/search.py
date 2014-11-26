@@ -117,7 +117,10 @@ def search(query,pageoff,domain):
   c = s.Searcher()
   domstr = def_domain[domain] if domain in def_domain else def_domain[0]
   start = time.time()
-  (res , hits , other_words) = c.search_and_toplevel(query , domstr , digestmaker = keyword_bold , pageoff=pageoff , default = enumnum)
+  
+  # other_words は別の検索語を表すユニコード文字列のリスト
+  # qwords_list はqueryを空白で区切ったうにコード文字列のリスト
+  (res , hits , other_words,qwords_list) = c.search_and_toplevel(query , domstr , digestmaker = keyword_bold , pageoff=pageoff , default = enumnum)
 
   interval = time.time() - start
 
@@ -140,8 +143,12 @@ def search(query,pageoff,domain):
       title = fixlen(xml.sax.saxutils.escape(title), 50 , dot = True).encode("utf-8")
       data = data.encode("utf-8")
       print "<div class=\"each\">"
-      print ("<div class=\"title\"><a href = \"/cgi-bin/redirect.py?url=%s\" title=\"%s\" target = \"_blank\">%s</a></div>" 
-                %(urllib.quote_plus(url) , xml.sax.saxutils.escape(url) ,"&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title))
+      print ("<div class=\"title\"><a href = \"/cgi-bin/redirect.py?url=%s&rank=%s&keyword=%s\" title=\"%s\" target = \"_blank\">%s</a></div>" 
+                %(urllib.quote_plus(url) , 
+                  number+1,
+                  urllib.quote_plus(u" ".join(qwords_list).encode("utf-8")),
+                  xml.sax.saxutils.escape(url) ,
+                  "&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title))
       print "<div class=\"url\">%s</div>" %(xml.sax.saxutils.escape(fixlen(url , 60 , dot = True)) )
       print "<div class=\"abst\">%s</div>" %(data)
       print "</div>"

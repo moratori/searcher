@@ -9,6 +9,8 @@ our = "http://localhost/"
 
 form = cgi.FieldStorage()
 url  = form.getvalue("url",our)
+rank = form.getvalue("rank","0")
+keyword = form.getvalue("keyword","")
 
 
 print "Status: 302 Found"

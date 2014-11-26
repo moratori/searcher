@@ -261,8 +261,10 @@ class Searcher(DB):
     # 各単語∈ flat_nlist で検索した結果
     
     # words は ["情報環境学部" , "スクールバス" , "時間"]
-    # みたいなリスト
-    self.regist_query(sorted(words)[0:3])
+    # みたいなユニコードのリスト
+
+    qwords_list = sorted(words)
+    self.regist_query(qwords_list[0:3])
     
 
     tmp = []
@@ -274,7 +276,7 @@ class Searcher(DB):
       # ここで n_id をappend してないので n_id は落ちてしまう
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
-    return (self.sort_toplevel(tmp,phrase_dic) , flat_nlist , self.other_words(words[0]))
+    return (self.sort_toplevel(tmp,phrase_dic) , flat_nlist , self.other_words(words[0]),qwords_list)
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
@@ -288,14 +290,14 @@ class Searcher(DB):
       return r_id_list[start:end] if (len(r_id_list) >= end) else r_id_list[start:]
     result = []
     # unicode もじの url,title,data を返す
-    (r_id_list , flat_nlist , other_words) = self.search_and(query,domstr)
+    (r_id_list , flat_nlist , other_words,qwords_list) = self.search_and(query,domstr)
     for r_id in part(r_id_list):
       tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
       (title,data) = tmp[0]
       (domain,path) = self.db.lookup_url(r_id)
       url = urlparse.urljoin(domain,path)
       result.append((url,title,(data if not digestmaker else digestmaker(flat_nlist,data))))
-    return result , len(r_id_list) , other_words
+    return result , len(r_id_list) , other_words , qwords_list
 
 
 
