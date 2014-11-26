@@ -7,6 +7,8 @@ import os
 import sys
 import searcher.core.searcher.main as s;
 import time
+import urllib
+import xml.sax.saxutils
 
 
 cgitb.enable()
@@ -19,7 +21,7 @@ FOOTER = "</body></html>"
 
 FORM = """
   <div id = "sform">
-      <form style = "display: inline; "name = "main" action="/cgi-bin/search.py">
+      <form style = "display: inline;" name = "main" action="/cgi-bin/search.py">
         <input type="radio" name = "domain" value = "0" %s>全て
         <input type="radio" name = "domain" value = "1" %s>電大トップ
         <input type="radio" name = "domain" value = "2" %s>SIE
@@ -37,10 +39,9 @@ FORM = """
   </div>
 """
 
-HEADER = '''
-<html>
+HEADER = '''<html>
   <head>
-    <meta http-equiv="Conten-Type" content="text/html; charset=utf8">
+    <meta http-equiv="Conten-Type" content="text/html; charset=UTF-8">
     <script type = "text/javascript" src = "/js/suggest.js"></script>
     <link rel="stylesheet" href="/style/sresult.css" type="text/css">
     <title>大学内検索エンジン</title>
@@ -85,7 +86,7 @@ def keyword_bold(queries,text,l = 160):
 
 def output_page(query , offset , now , domain):
   print ("""
-  <a href = "/cgi-bin/search.py?keyword=%s&page=%s&domain=%s" style ="text-decoration: none;"><button type = "submit" style = "width: 32;height: 32;">%s</button>&nbsp;&nbsp;""" %(query.encode("utf-8") , offset , domain ,(("<b><font color = \"maroon\">" + str(offset) + "</font></b>") if (offset == now) else offset)))
+  <a href = "/cgi-bin/search.py?keyword=%s&page=%s&domain=%s" style ="text-decoration: none;"><button type = "submit" style = "width: 32;height: 32;">%s</button></a>&nbsp;""" %(query.encode("utf-8") , offset , domain ,(("<b><font color = \"maroon\">" + str(offset) + "</font></b>") if (offset == now) else offset)))
 
 
 def output_buttons(enumnum,pageoff,hits,query,domain):
@@ -136,11 +137,12 @@ def search(query,pageoff,domain):
     print "<div id = \"main\">"
     for (number , (url,title,data)) in enumerate(res):
       url = url.encode("utf-8")
-      title = fixlen(title, 50 , dot = True).encode("utf-8")
+      title = fixlen(xml.sax.saxutils.escape(title), 50 , dot = True).encode("utf-8")
       data = data.encode("utf-8")
       print "<div class=\"each\">"
-      print "<div class=\"title\"><a href = \"%s\" target = \"_blank\">%s</a></div>" %(url , "&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title)
-      print "<div class=\"url\">%s</div>" %(fixlen(url , 60 , dot = True) )
+      print ("<div class=\"title\"><a href = \"/cgi-bin/redirect.py?url=%s\" title=\"%s\" target = \"_blank\">%s</a></div>" 
+                %(urllib.quote_plus(url) , xml.sax.saxutils.escape(url) ,"&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title))
+      print "<div class=\"url\">%s</div>" %(xml.sax.saxutils.escape(fixlen(url , 60 , dot = True)) )
       print "<div class=\"abst\">%s</div>" %(data)
       print "</div>"
     print "</div>"

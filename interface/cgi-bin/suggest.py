@@ -17,7 +17,7 @@ print "Content-Type: text/plain\n"
 field = cgi.FieldStorage()
 query = field.getvalue("p","")
 
-cur.execute("select w2 from nounrelation where w1 = '%s' order by weight desc limit 5" %(query))
+cur.execute("select w2 from nounrelation where w1 = '%s' order by weight desc limit 6" %(query))
 
 res = "   ".join([w2 for (w2,) in cur.fetchall()])
 

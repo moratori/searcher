@@ -5,7 +5,7 @@ use searcher;
 create table dmapper(d_id int primary key not null auto_increment, name text , vtime int default 0);
 create table rmapper(r_id int primary key not null auto_increment, d_id int  , path varchar(16384) default '/', vtime int default 0, counter int default 0);
 
-create table data(r_id int primary key not null , title text , data text , size int , hash varchar(64) , new boolean);
+create table data(r_id int primary key not null , title text , data mediumtext , size int , hash varchar(64) , new boolean);
 
 create table black(name varchar(512) not null);
 create table white(name varchar(512) not null);
