@@ -8,6 +8,7 @@ import sys
 import searcher.core.searcher.main as s;
 import time
 import urllib
+import urlparse
 import xml.sax.saxutils
 
 
@@ -138,17 +139,22 @@ def search(query,pageoff,domain):
     print "<div id = \"info\">「<b>%s</b>」の検索結果 <b>%s</b> ページ目 <b>%s</b>件のヒット( <b>%.4f</b> 秒 )</div>" %(query.encode("utf-8") , pageoff ,hits , interval)
 
     print "<div id = \"main\">"
-    for (number , (url,title,data)) in enumerate(res):
+    for (number , (url,title,data,md_id)) in enumerate(res):
       url = url.encode("utf-8")
       title = fixlen(xml.sax.saxutils.escape(title), 50 , dot = True).encode("utf-8")
       data = data.encode("utf-8")
+      uobj = urlparse.urlparse(url)
       print "<div class=\"each\">"
-      print ("<div class=\"title\"><a href = \"/cgi-bin/redirect.py?url=%s&rank=%s&keyword=%s\" title=\"%s\" target = \"_blank\">%s</a></div>" 
+
+      print ("<div class=\"title\"><a href = \"/cgi-bin/redirect.py?url=%s&rank=%s&keyword=%s\" title=\"%s\" target = \"_blank\">%s</a>&nbsp;&nbsp;%s</div>" 
                 %(urllib.quote_plus(url) , 
                   number+1,
                   urllib.quote_plus(u" ".join(qwords_list).encode("utf-8")),
                   xml.sax.saxutils.escape(url) ,
-                  "&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title))
+                  "&lt;UNTITLED WEB PAGE&gt;" if (title == "") else title,
+                  ("" if not md_id else 
+                  "<img src=\"/cgi-bin/favicon.py?d_id=%s\" width=\"16\" height=\"16\">" %md_id)))
+
       print "<div class=\"url\">%s</div>" %(xml.sax.saxutils.escape(fixlen(url , 60 , dot = True)) )
       print "<div class=\"abst\">%s</div>" %(data)
       print "</div>"

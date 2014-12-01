@@ -91,6 +91,11 @@ class DB(Sqlutil):
     (name,) = domain_result[0]
     return (name,path)
 
+  def lookup_d_id(self,r_id):
+    path_result = self.select("d_id" , "rmapper" , "where r_id = %s" %r_id)
+    (d_id,) = path_result[0]
+    return d_id
+
 
   def revlookup_dname(self,dname):
     result = self.select("d_id" , DMAPPER , "where name = \"%s\"" %dname)

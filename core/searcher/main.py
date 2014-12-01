@@ -272,15 +272,22 @@ class Searcher(DB):
       (n_id , rlist) = self.search_word(noun , domstr)
       # nmapper に存在しないような名詞だったら n_id はNone に成るわけだけど
       # そうなったら 検索結果は存在しない and 検索だから
-      if (not n_id) or (not rlist): return ([],[],[])
+      if (not n_id) or (not rlist): return ([],[],[],[])
       # ここで n_id をappend してないので n_id は落ちてしまう
       # つまり なにで検索されたのかわからなくなる
       tmp.append(rlist)
     return (self.sort_toplevel(tmp,phrase_dic) , flat_nlist , self.other_words(words[0]),qwords_list)
 
+  def exists_favicon(self,d_id):
+    """
+      d_idのためのファビコンが存在するか否か判定
+    """
+
+    return d_id if self.db.select("d_id","favicon","where d_id = %s" %d_id) else False
+
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
-  def search_and_toplevel(self,query,domstr,digestmaker = None,pageoff=1,default=12):
+  def search_and_toplevel(self,query,domstr,digestmaker = (lambda a,b,c: c),pageoff=1,default=12):
     def part(r_id_list):
       tmp = pageoff * default
       # tmp-default の数は user がおかしな番号いれてこなければ
@@ -294,9 +301,10 @@ class Searcher(DB):
     for r_id in part(r_id_list):
       tmp = self.db.select(["title","data"] , "data" , "where r_id = %s" %r_id)
       (title,data) = tmp[0]
+      d_id = self.db.lookup_d_id(r_id)
       (domain,path) = self.db.lookup_url(r_id)
       url = urlparse.urljoin(domain,path)
-      result.append((url,title,(data if not digestmaker else digestmaker(flat_nlist,data))))
+      result.append((url,title,digestmaker(flat_nlist,data),self.exists_favicon(d_id)))
     return result , len(r_id_list) , other_words , qwords_list
 
 

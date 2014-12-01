@@ -15,6 +15,7 @@ import hashlib
 import socket
 import pickle
 import os
+import base64
 import zipfile
 
 from HTMLParser import HTMLParser
@@ -33,8 +34,7 @@ BLACK   = "black"
 WHITE   = "white"
 
 
-#logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler3.log")
-logging.basicConfig(filename="/home/moratori/Desktop/log5.log")
+logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/crawler.log")
 
 
 
@@ -290,10 +290,30 @@ class Crawler:
 
     while roots:
       node = roots.pop(0)
+      self.crawl_favicon(node)
       self.crawl(node)
 
     self.finish()
     return 
+
+  def crawl_favicon(self,node):
+    """
+      node は全て同じドメインのurlなのでここで
+      そのファビコンを得る。
+      pathの違いでドメインのファビコンが様々変わることは無いことを意図している
+    """
+    if node.isempty():return
+    target = node.container[0]
+    d_id   = target.d_id
+    urlobj = urlparse.urlparse(target.url)
+    favicon_url = urlparse.urlunparse((urlobj.scheme,urlobj.netloc,"favicon.ico","","",""))
+    try:
+      data = urllib2.urlopen(favicon_url,timeout=1).read()
+    except:return
+    self.db.execute("insert into favicon values(%s,'%s')" %(d_id,base64.b64encode(data)))
+    self.db.commit()
+    return
+
  
 
   def crawl(self,node):
@@ -343,7 +363,6 @@ class Crawler:
 
   # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
   def analyze(self,r_id,d_id,url):
-    print "Acessing: %s" %url
     try:
       req = urllib2.Request(url,headers={"User-Agent": self.useragent})
       connection = urllib2.urlopen(req,timeout=self.timeout)

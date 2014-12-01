@@ -3,6 +3,7 @@ create database searcher default character set utf8;
 use searcher;
 
 create table dmapper(d_id int primary key not null auto_increment, name text , vtime int default 0);
+create table favicon(d_id int primary key not null , data mediumtext);
 create table rmapper(r_id int primary key not null auto_increment, d_id int  , path varchar(16384) default '/', vtime int default 0, counter int default 0);
 
 create table data(r_id int primary key not null , title text , data mediumtext , size int , hash varchar(64) , new boolean);

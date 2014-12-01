@@ -232,7 +232,8 @@ class Indexer:
     self.db.commit()
 
   # PageRankで ランク付けを行う
-  def __pageranking(self,network,initscore = 100.0,limit=7):
+  # どことも接続のないノードをどうするか考える
+  def __pageranking(self,network,initscore = 100.0,limit=50):
     nodes = network.keys()
     result = {node: initscore for node in nodes}
     for d in range(limit):
