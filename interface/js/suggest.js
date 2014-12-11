@@ -25,6 +25,14 @@ function showrel(s){
   xhr.send()
 }
 
+function check(){
+  if (document.main.keyword.value == ""){
+          return false;
+  }else{
+          return true;
+  }
+}
+
 function changed() {
   var init = "";
   setTimeout(function () {

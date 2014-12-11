@@ -296,6 +296,9 @@ class Crawler:
     self.finish()
     return 
 
+
+  ###
+  ### favicon のクロールで primary key がダブルことがおこるっぽい
   def crawl_favicon(self,node):
     """
       node は全て同じドメインのurlなのでここで
@@ -364,6 +367,7 @@ class Crawler:
   # 実際に url にアクセスしてDBに保存したりする処理のコントローラ
   def analyze(self,r_id,d_id,url):
     try:
+      print "Accessing: " , url
       req = urllib2.Request(url,headers={"User-Agent": self.useragent})
       connection = urllib2.urlopen(req,timeout=self.timeout)
       mtype = connection.info().getheader("Content-Type")

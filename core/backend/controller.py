@@ -9,6 +9,7 @@ import urlparse
 import logging
 import datetime
 import traceback
+import os
 import searcher.core.indexer.nounregister as nreg
 import searcher.core.indexer.nounrel as nrel
 
@@ -65,8 +66,23 @@ class TaskController:
   resource_per_domain = 5
   work_load = 6
   
+  """
+  newslimit = 22
+  hour = 23
+  weekday = 4
+  """
+
+  newslimit = 5
+  hour = 14
+  weekday = 3
+  
   # ((rpd - 1) * c_interval + timeout * rpd) * work_load であるべき
+  """
   indexing_interval = ((resource_per_domain - 1) * 4 + 15 * resource_per_domain) * work_load
+  """
+
+  indexing_interval = 10
+
 
   def __init__(self, port , backlog , db_host , db_user , db_passwd , db_name):
     self.lsock= s.socket(s.AF_INET , s.SOCK_STREAM , s.IPPROTO_TCP)
@@ -89,9 +105,9 @@ class TaskController:
 
     day = datetime.datetime.today()
 
-    a = (cnt > 5000)
-    b = day.hour == 23
-    c = day.weekday() == 4
+    a = (cnt > self.newslimit)
+    b = day.hour == self.hour
+    c = day.weekday() == self.weekday
 
     return (a, a and b and c)
 
@@ -102,13 +118,18 @@ class TaskController:
         (stop_crawl , make_index) = self.check_indexing()
         if make_index:
           logging.warning("\nIndexing start at %s" %str(datetime.datetime.today()))
+          print "indexing start"
+          print "sleeping for crawler"
           time.sleep(self.indexing_interval)
+          print "creating relation mapping..."
           nrel.main()
+          print "finished"
           # 以下の処理 nreg.indexing()は indexing , scoring , pageranking の３つに別れるんだけど
           # indexing の部分で SEGV くらって落とされると、 exceptにも引っかからず残りのscoringもpagerankingも行われず
           # 死ぬ
+          print "creating indexing ..."
           nreg.indexing()
-          self.stop(flag=True)
+          print "finished !"
         else:
           (new , (a,p)) = self.lsock.accept()
           self.serv(new,stop_crawl)
@@ -212,7 +233,7 @@ class TaskController:
       ターゲットが無ければ適当な時間を置いてポーリングしてくる
     """
     if stop_crawl:
-      data = ""
+      data = pickle.dumps([])
     else:
       data = pickle.dumps(self.getarget())
 
@@ -220,17 +241,10 @@ class TaskController:
     csock.sendall(header + data)
     csock.close()
 
-  def stop(self,flag=False):
+  def stop(self):
     self.lsock.close()
     self.db_cursor.close()
     self.db_connecter.close()
-    if flag:
-      logging.warninig("\nwill now halt!!! waitting crawlers...")
-      time.sleep(self.indexing_interval)
-      logging.warninig("\nrebooting!!!")
-      os.system("shutdown -r now")
-
-
 
 
 if __name__ == "__main__" :

@@ -22,13 +22,13 @@ FOOTER = "</body></html>"
 
 FORM = """
   <div id = "sform">
-      <form style = "display: inline;" name = "main" action="/cgi-bin/search.py">
+      <form style = "display: inline;" name = "main" action="/cgi-bin/search.py" onSubmit="return check()">
         <input type="radio" name = "domain" value = "0" %s>全て
         <input type="radio" name = "domain" value = "1" %s>電大トップ
         <input type="radio" name = "domain" value = "2" %s>SIE
         <input type="radio" name = "domain" value = "3" %s>CSE
         <br><br>
-        <input type="text" name="keyword" class="word">
+        <input type="text" name="keyword" class="word" value = "%s">
         <input type="submit" value="検索" class="button">
       </form>
       <br>
@@ -167,8 +167,13 @@ def search(query,pageoff,domain):
   c.finish()
 
 
-def checked_radio(form , domain):
-  return form %tuple(["" if each != domain else "checked" for each in range(len(def_domain))])
+def fillform(form , domain , query):
+  """
+    前回のドメイン検索の値と検索ワードでフォームを埋める
+  """
+  tmp = ["" if each != domain else "checked" for each in range(len(def_domain))]
+  tmp.append(xml.sax.saxutils.escape(query.encode("utf-8")))
+  return form %tuple(tmp)
 
 def main(environ):
   if (not "REQUEST_METHOD" in environ) or (environ["REQUEST_METHOD"] != METHOD):
@@ -187,7 +192,7 @@ def main(environ):
   except:
     print NO_KEYWORD
     return
-  print HEADER + checked_radio(FORM , domain)
+  print HEADER + fillform(FORM , domain , query)
   search(query,page,domain)
   print FOOTER
 

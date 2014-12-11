@@ -13,7 +13,7 @@
     </div>
 
     <div id = "topmain">
-      <form name = "main" action="/cgi-bin/search.py" method="GET">
+      <form name = "main" action="/cgi-bin/search.py" method="GET" onsubmit="return check()">
         <input type="radio" name = "domain" value = "0" checked>全て
         <input type="radio" name = "domain" value = "1" >電大トップ
         <input type="radio" name = "domain" value = "2" >SIE

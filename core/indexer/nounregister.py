@@ -7,6 +7,8 @@ import math
 import traceback
 import time
 import datetime
+import socket
+import pickle
 from searcher.core.db.sqlutil import *
 
 
@@ -66,9 +68,11 @@ class Indexer:
 
   english_stop = set([u"of",u"for",u"is",u"am",u"are",u"the",u"an",u"a",u"as",u"in",u"by",u"on",u"to",u"at",u"it",u"its",u"up"])
 
-  def __init__(self):
+
+  def __init__(self,agents):
     self.db = DB(host,user,passwd)
     self.db.open(db)
+    self.agents = agents
 
   # target となる新しいテキストをもってくる
   def gettarget(self):
@@ -143,72 +147,104 @@ class Indexer:
 
     return title
 
-  def indexing(self):
-    
-    # これ 空リストで初期化してたけど
-    # 毎回index作成処理を初めからやることを仮定してしまってるので
-    # ここで初めに nmapper の名詞をとっとこう
-    all_noun_list = list(self.db.select(["n_id","noun"] , "nmapper")) # []
 
+  def connect_agents(self):
+    result = []
+    for addr in self.agents:
+      try:
+        s = socket.socket(socket.AF_INET , socket.SOCK_STREAM , socket.IPPROTO_TCP)
+        s.connect(addr)
+        result.append(s)
+      except:pass
+    return result
+
+  def assign(self):
+    """
+      indexing agent に仕事を割り当てる
+      controllerが索引生成処理を呼ぶのは索引を生成スべき文書数が
+      多い時だけ。
+      多いというのは少なくともagent以上であることを意図している
+      diff << datanum であることを意図しているのでdiffは簡単のため無視してしまう
+      
+    """
+
+    ((datanum,),)= self.db.select("count(r_id)","data","where new = 1")
+    live_agents = self.connect_agents()
+
+    while (not live_agents):
+      logging.warning("agents not found!!")
+      time.sleep(30)
+      live_agents = self.connect_agents()
+
+    assert (datanum >= len(live_agents))
+
+    number_of_agent = len(live_agents)
+    work_load = datanum / number_of_agent
+    diff = datanum % number_of_agent
+
+    # 0 <= diff <= number_of_agent - 1
+
+    target = map(lambda x:x[0] , self.db.select("r_id","data","where new = 1"))
+    
+    start = 0
+    for agent in live_agents:
+      data = pickle.dumps(target[start:start+work_load])
+      agent.sendall(("Length:%s\n" %len(data)) + data)
+      start += work_load
+
+    return (datanum , number_of_agent , work_load)
+
+
+  # 0 <= rest <= number_of_agent - 1
+  def wait(self,info):
+    """
+      agentが成功するまで待つ
+      全てのagentが成功することを意図している
+    """
+    (datanum , number_of_agent , work_load) = info
+    end = datanum - number_of_agent * work_load
+    ((new,),) = self.db.select("count(r_id)" , "data" , "where new = 1")
+    # 常に new >= rest
+    # 全ての agentが成功する事を意図している場合
+    # new != rest となる
+    while (new > end): 
+      print "new: " , new
+      print "end: " , end
+      print "new > end" , (new > end)
+      time.sleep(60)
+      ((new,),) = self.db.select("count(r_id)" , "data" , "where new = 1")
+      self.db.commit()
+    print "waiting finished!"
+    return
+
+
+  def indexing(self):
+    """
+      ここで先に全ての語をDBに格納して他のIndexer Agentから
+      検索できるようにしておく
+
+      Indexer Agent はサーバとして実装いておいて
+      ここのメソッドからAgent　にpingを飛ばす
+    """
+    
     # ここの data　は unicode
     for (r_id , title , data) in self.gettarget():
       # noun_list is unicode noun list! 
       (noun_list , cnt) = getnoun(data)
 
-      len_nlist = len(noun_list)
-
       # 名詞がないリソースはいらない
-      if (len_nlist == 0) or (cnt == 0):
+      if (len(noun_list) == 0) or (cnt == 0):
         self.db.erase(r_id)
         self.db.commit()
         continue
-      
-      
-      # r_id がタイトルｎ無いコンテンツだった場合のために
-      # 推定を行なう
-      if not title: 
-        title = self.estimate_title(r_id,noun_list)
 
-
-      avg_tf = 0
-      cnt    = 0
-      for (_ , noun) in all_noun_list:
-        tmp = count_noun(noun , title , data)
-        if tmp > 0:
-          cnt += 1
-          avg_tf += tmp
-      avg_tf /= (1 if cnt == 0 else cnt)
-
-      # いままでに得られている 名詞のリストも考える
-      # avg_tf が0 って事は既存の名詞を含まない様な文書ということなので
-      if avg_tf != 0:
-        for (num , (n_id,noun)) in enumerate(all_noun_list): #enumerate(self.db.select(["n_id","noun"] , "nmapper")):
-          freq  = (count_noun(noun , title , data)) / avg_tf 
-          if freq == 0 : 
-            continue
-          else:
-            self.registfreq(n_id , r_id , freq)
-            self.registplace(n_id , r_id , self.getoccurrence(noun,data))
-            if ((num % 400) == 0):self.db.commit()
-        self.db.commit()
-
-      # avg(s<-d ,  tf(s,d)) を求める。これが分母となる
-      avg_tf = reduce(lambda r,x: r + count_noun(x,title,data) , noun_list , 0)/float(len_nlist)
-
-      # data 自身が含んでいる名詞について考える
       for noun in noun_list:
-        # ストップワードやゴミについては索引を作らない
-        if self.stop_word(noun): continue
-        (n_id , new) = self.registnoun(noun.encode("utf-8"))
-        if new : all_noun_list.append((n_id,noun))
-        freq  = (count_noun(noun , title , data)) / avg_tf 
-        if freq == 0 : 
-          continue
-        else:
-          self.registfreq(n_id , r_id , freq)
-          self.registplace(n_id , r_id , self.getoccurrence(noun,data))
-      self.indexed(r_id)
-      self.db.commit()
+        if self.stop_word(noun) : continue
+        (n_id , isnew) = self.registnoun(noun.encode("utf-8")) 
+
+    self.db.commit()
+    self.wait(self.assign())
+
 
   # ストップワードであるかをチェックする
   # 日本語の文章をmecabにかけている文にはいいんだけど
@@ -248,6 +284,7 @@ class Indexer:
           if c in tmp:tmp[c] += out
         result[node] = 0
       result = tmp
+    
     return result
 
   # page rank によるウェブページのランク付けを行う
@@ -281,7 +318,7 @@ def indexing(clear=True):
     現状の実装だと毎回インデックスを全て作成しなおしている.(全データをnewにしている)
 
   """
-  c = Indexer()
+  c = Indexer([("127.0.0.1",4321) , ("127.0.0.1",4322) , ("127.0.0.1",4323)])
 
   if clear:
     c.db.execute("drop table if exists freq;")
