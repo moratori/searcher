@@ -59,7 +59,6 @@ class TaskController:
     キッチリ実装するならその値をcontrollerと交換して、最長のwaitを待つべき
   """
 
-  #domain_interval = 40
   domain_interval = 40
   resource_interval = 3600 * 24 * 6
 
@@ -72,16 +71,16 @@ class TaskController:
   weekday = 4
   """
 
-  newslimit = 5
-  hour = 14
-  weekday = 3
+  newslimit = 200
+  hour = 13
+  weekday = 0
   
   # ((rpd - 1) * c_interval + timeout * rpd) * work_load であるべき
   """
   indexing_interval = ((resource_per_domain - 1) * 4 + 15 * resource_per_domain) * work_load
   """
 
-  indexing_interval = 10
+  indexing_interval = 15
 
 
   def __init__(self, port , backlog , db_host , db_user , db_passwd , db_name):
@@ -116,6 +115,7 @@ class TaskController:
     while True:
       try: 
         (stop_crawl , make_index) = self.check_indexing()
+        print make_index
         if make_index:
           logging.warning("\nIndexing start at %s" %str(datetime.datetime.today()))
           print "indexing start"

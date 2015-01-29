@@ -285,9 +285,10 @@ class Crawler:
     try:
       roots = self.__nexttarget()
     except:
+      print "failed"
       logging.warning("\nconnect failed: " + str(datetime.datetime.today()) + "\nto controller, retry later ...\n")
       return
-
+    
     while roots:
       node = roots.pop(0)
       self.crawl_favicon(node)
@@ -309,6 +310,10 @@ class Crawler:
     target = node.container[0]
     d_id   = target.d_id
     urlobj = urlparse.urlparse(target.url)
+
+    self.db.execute("select d_id from favicon where d_id = %s" %(d_id))
+    if self.db.cursor.fetchone(): return 
+
     favicon_url = urlparse.urlunparse((urlobj.scheme,urlobj.netloc,"favicon.ico","","",""))
     try:
       data = urllib2.urlopen(favicon_url,timeout=1).read()

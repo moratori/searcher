@@ -2,8 +2,10 @@
 #coding:utf-8
 
 import cgi
+import cgitb
 import urllib
 
+cgitb.enable()
 
 our = "http://localhost/"
 

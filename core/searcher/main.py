@@ -287,7 +287,7 @@ class Searcher(DB):
 
   # digestmaker は unicode の本文文字列,unicodeのqueryをうけとって
   # 本文の要約をつくる関数
-  def search_and_toplevel(self,query,domstr,digestmaker = (lambda a,b,c: c),pageoff=1,default=12):
+  def search_and_toplevel(self,query,domstr,digestmaker = (lambda a,b,c=160: b),pageoff=1,default=12):
     def part(r_id_list):
       tmp = pageoff * default
       # tmp-default の数は user がおかしな番号いれてこなければ

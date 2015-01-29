@@ -1,8 +1,14 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 #coding:utf-8
+
+
+print "Content-Type: text/html\n"
 
 import cgi
 import cgitb
+
+cgitb.enable()
+
 import os
 import sys
 import searcher.core.searcher.main as s;
@@ -12,7 +18,7 @@ import urlparse
 import xml.sax.saxutils
 
 
-cgitb.enable()
+
 
 
 INVALID_METHOD = "<html>invalid method</html>"
@@ -53,9 +59,6 @@ HEADER = '''<html>
 
 
 def_domain = {0: "" , 1: "web.dendai.ac.jp" , 2: "sie.dendai.ac.jp" , 3: "cse.dendai.ac.jp"}
-
-
-print "Content-Type: text/html\n"
 
 
 
@@ -197,7 +200,6 @@ def main(environ):
   print FOOTER
 
 
-if __name__ == "__main__":
-  main(os.environ)
-  sys.exit()
+main(os.environ)
+sys.exit()
 

@@ -168,7 +168,7 @@ class IndexingAgent:
 if __name__ == "__main__": 
   logging.basicConfig(filename="/home/moratori/Github/searcher/LOG/indexingagent.log")
   (user,passwd) = map(lambda x:x.strip(),open("/home/moratori/Github/searcher/.pwd").readlines())
-  c = IndexingAgent(4322,
+  c = IndexingAgent(4323,
       "localhost",user,passwd,"searcher")
   c.wait()
 
