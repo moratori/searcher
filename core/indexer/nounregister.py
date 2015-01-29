@@ -208,9 +208,6 @@ class Indexer:
     # 全ての agentが成功する事を意図している場合
     # new != rest となる
     while (new > end): 
-      print "new: " , new
-      print "end: " , end
-      print "new > end" , (new > end)
       time.sleep(60)
       ((new,),) = self.db.select("count(r_id)" , "data" , "where new = 1")
       self.db.commit()
